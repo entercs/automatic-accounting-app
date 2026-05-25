@@ -36,7 +36,13 @@ class FinanceNotificationService : AccessibilityService() {
 
     // Global dedup: prevent same amount from being recorded twice within 30s
     private val recentRecordedAmounts = mutableMapOf<Double, Long>()
+    private val recentNotificationHashes = mutableMapOf<Int, Long>()
     private val dedupMutex = Mutex()
+
+    // 通知内容去重窗口（毫秒）
+    private val notifDedupWindowMs = 10_000L
+    // 金额去重窗口（毫秒）
+    private val amountDedupWindowMs = 30_000L
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
         val packageName = event.packageName?.toString() ?: return
@@ -117,6 +123,19 @@ class FinanceNotificationService : AccessibilityService() {
         }
 
         if (finalText.isBlank()) return
+
+        // 内容去重：相同内容的通知在短时间内只处理一次
+        val notifHash = finalText.hashCode()
+        val now = System.currentTimeMillis()
+
+        // 快速检查是否需要跳过（非原子，但可接受）
+        val lastTime = recentNotificationHashes[notifHash]
+        if (lastTime != null && now - lastTime < notifDedupWindowMs) {
+            Log.d(TAG, "跳过重复通知: hash=$notifHash")
+            return
+        }
+        recentNotificationHashes.entries.removeAll { now - it.value > notifDedupWindowMs }
+        recentNotificationHashes[notifHash] = now
 
         scope.launch {
             val parsed = parser.parse(packageName, title, finalText)
@@ -208,7 +227,7 @@ class FinanceNotificationService : AccessibilityService() {
         // Atomic dedup: only one coroutine can pass for the same amount
         val shouldRecord = dedupMutex.withLock {
             val lastTime = recentRecordedAmounts[parsed.amount]
-            if (lastTime != null && now - lastTime < 30_000) return
+            if (lastTime != null && now - lastTime < amountDedupWindowMs) return
             recentRecordedAmounts.entries.removeAll { now - it.value > 60_000 }
             recentRecordedAmounts[parsed.amount] = now
             true

@@ -66,6 +66,8 @@ class AddTransactionViewModel(
     private val _saved = MutableStateFlow(false)
     val saved: StateFlow<Boolean> = _saved.asStateFlow()
 
+    private var saveTriggered = false
+
     private val _showEquals = MutableStateFlow(false)
     val showEquals: StateFlow<Boolean> = _showEquals.asStateFlow()
 
@@ -240,19 +242,21 @@ class AddTransactionViewModel(
     }
 
     private fun doSave() {
+        if (saveTriggered) return
+        saveTriggered = true
         val expr = _amount.value
         // Strip trailing operator and evaluate if needed
         val cleanExpr = if (expr.isNotEmpty() && expr.last() in listOf('+', '-')) expr.dropLast(1) else expr
         val amt = if (cleanExpr.any { it == '+' || it == '-' }) {
-            evaluateExpression(cleanExpr) ?: return
+            evaluateExpression(cleanExpr) ?: run { saveTriggered = false; return }
         } else {
-            cleanExpr.toDoubleOrNull() ?: return
+            cleanExpr.toDoubleOrNull() ?: run { saveTriggered = false; return }
         }
-        if (amt <= 0) return
-        if (_selectedAccountId.value <= 0) return
+        if (amt <= 0) { saveTriggered = false; return }
+        if (_selectedAccountId.value <= 0) { saveTriggered = false; return }
         val isTransfer = _selectedType.value == TransactionType.TRANSFER
-        if (isTransfer && _transferToAccountId.value <= 0) return
-        if (isTransfer && _transferToAccountId.value == _selectedAccountId.value) return
+        if (isTransfer && _transferToAccountId.value <= 0) { saveTriggered = false; return }
+        if (isTransfer && _transferToAccountId.value == _selectedAccountId.value) { saveTriggered = false; return }
 
         val finalCategoryId: Long = if (!isTransfer && _selectedCategoryId.value <= 0) {
             val cats = if (_selectedType.value == TransactionType.INCOME) incomeCategories.value else expenseCategories.value

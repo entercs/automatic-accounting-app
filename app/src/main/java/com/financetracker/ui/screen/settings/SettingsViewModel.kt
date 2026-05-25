@@ -70,11 +70,6 @@ class SettingsViewModel(
 
     fun clearFeedback() { _feedback.value = null }
 
-    fun getNotificationLog(): List<com.financetracker.notification.NotificationLogEntry> =
-        com.financetracker.notification.NotificationLogger.getAll()
-
-    fun clearNotificationLog() = com.financetracker.notification.NotificationLogger.clear()
-
     init {
         // Fix old default account names (one-time)
         viewModelScope.launch { accountRepo.fixAccountNames() }

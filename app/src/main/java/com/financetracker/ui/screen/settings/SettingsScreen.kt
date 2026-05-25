@@ -452,32 +452,6 @@ fun SettingsScreen() {
                 }
             }
 
-            // Notification debug log
-            item {
-                val logEntries = remember { mutableStateOf(viewModel.getNotificationLog()) }
-                var expanded by remember { mutableStateOf(false) }
-                TextButton(onClick = {
-                    logEntries.value = viewModel.getNotificationLog()
-                    expanded = !expanded
-                }) {
-                    Text(if (expanded) "▼ 通知日志 (${logEntries.value.size})" else "▶ 通知日志 (${logEntries.value.size})")
-                }
-                if (expanded && logEntries.value.isNotEmpty()) {
-                    Card(modifier = Modifier.fillMaxWidth()) {
-                        Column(modifier = Modifier.padding(8.dp)) {
-                            logEntries.value.take(10).forEach { entry ->
-                                Text(entry.shortForm, fontSize = 10.sp, modifier = Modifier.padding(vertical = 1.dp))
-                            }
-                            TextButton(onClick = { viewModel.clearNotificationLog(); logEntries.value = emptyList() }) {
-                                Text("清空日志", fontSize = 12.sp)
-                            }
-                        }
-                    }
-                } else if (expanded) {
-                    Text("暂无通知记录", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(8.dp))
-                }
-            }
-
             item { Spacer(modifier = Modifier.height(8.dp)) }
 
             // Version

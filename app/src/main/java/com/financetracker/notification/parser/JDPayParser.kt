@@ -11,19 +11,46 @@ class JDPayParser : NotificationParser {
     // 支出关键词
     private val expenseKeywords = listOf("支付", "消费", "购买")
 
+    // 匹配支付/交易金额（带¥或元）
     private val amountSymbolPattern = Regex("[¥￥](\\d+\\.?\\d*)")
     private val amountYuanPattern = Regex("(\\d+\\.?\\d*)\\s*元")
+
+    // 过滤掉优惠/礼金类金额的关键词
+    private val excludeKeywords = listOf("礼金", "优惠", "抵扣", "红包", "叠加", "满减", "立减", "返现", "积分", "加赠", "券", "返利")
 
     override fun parse(packageName: String, title: String, text: String): ParsedNotification? {
         if (packageName != "com.jingdong.app.mall") return null
         val combined = "$title $text"
 
-        var amount = amountSymbolPattern.find(combined)?.groupValues?.get(1)?.toDoubleOrNull()
-        if (amount == null) {
-            amount = amountYuanPattern.find(combined)?.groupValues?.get(1)?.toDoubleOrNull()
-        }
-        if (amount == null) return null
+        // 提取所有金额
+        val amounts = mutableListOf<Double>()
 
+        amountSymbolPattern.findAll(combined).forEach { match ->
+            match.groupValues[1].toDoubleOrNull()?.let { amount ->
+                // 检查这个金额是否在排除关键词附近
+                val startIdx = match.range.first
+                val endIdx = match.range.last + 1
+                val context = combined.substring(maxOf(0, startIdx - 6), minOf(combined.length, endIdx + 6))
+                val shouldExclude = excludeKeywords.any { context.contains(it) }
+                if (!shouldExclude) amounts.add(amount)
+            }
+        }
+
+        amountYuanPattern.findAll(combined).forEach { match ->
+            match.groupValues[1].toDoubleOrNull()?.let { amount ->
+                // 检查这个金额是否在排除关键词附近
+                val startIdx = match.range.first
+                val endIdx = match.range.last + 1
+                val context = combined.substring(maxOf(0, startIdx - 6), minOf(combined.length, endIdx + 6))
+                val shouldExclude = excludeKeywords.any { context.contains(it) }
+                if (!shouldExclude) amounts.add(amount)
+            }
+        }
+
+        // 优先取最大金额（通常是实际交易金额）
+        val amount = amounts.maxOrNull() ?: return null
+
+        // 判断收入还是支出
         val isIncome = incomeKeywords.any { combined.contains(it) }
         val type = if (isIncome) TransactionType.INCOME else TransactionType.EXPENSE
 
