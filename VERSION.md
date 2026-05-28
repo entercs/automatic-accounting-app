@@ -1,5 +1,22 @@
 # 版本记录
 
+## 版本2 (commit: 7f5b393)
+
+**提交时间**: 2026-05-28
+
+**功能更新**:
+1. **计算器浮点精度修复** - 使用 BigDecimal 计算并四舍五入保留2位小数，修复 `21.39+0.1` 显示 `21.490000000000002` 的问题
+2. **支付宝红包/补贴误记修复** - 新增 `nonTransactionAmountContexts` 过滤上下文，避免"淘宝闪购10元红包今晚失效"等非交易通知被误记
+3. **免密扣款漏记修复** - 移除"积分"排除关键词，修复含"积分"提示的免密/自动扣款通知漏记问题
+
+**涉及文件**:
+- `app/src/main/java/com/financetracker/ui/screen/add/AddTransactionViewModel.kt`
+- `app/src/main/java/com/financetracker/notification/parser/AlipayParser.kt`
+
+**APK**: `apk/20260528v1.apk`
+
+---
+
 ## 版本1 (commit: 3894dcc)
 
 **提交时间**: 2026-05-17

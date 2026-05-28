@@ -30,6 +30,12 @@ class AlipayParser : NotificationParser {
     // 免密/自动扣款支付格式的金额提取
     private val autoDeductAmountPattern = Regex("一笔(\\d+\\.?\\d*)元")
 
+    // 过滤非交易类金额的上下文关键词（需同时满足金额存在）
+    private val nonTransactionAmountContexts = listOf(
+        "红包今晚失效", "红包即将失效", "补贴金额", "优惠券", "代金券",
+        "加赠", "返现", "返利"
+    )
+
     override fun parse(packageName: String, title: String, text: String): ParsedNotification? {
         if (packageName !in supportedPackages) return null
         val combined = "$title $text"
@@ -40,10 +46,20 @@ class AlipayParser : NotificationParser {
             amount = amountSymbolPattern.find(combined)?.groupValues?.get(1)?.toDoubleOrNull()
         }
         if (amount == null) {
-            // 尝试从"一笔XX元"格式提取（自动扣款场景）
             amount = autoDeductAmountPattern.find(combined)?.groupValues?.get(1)?.toDoubleOrNull()
         }
-        if (amount == null) return null
+        if (amount == null || amount == 0.0) return null
+
+        // 如果金额对应的上下文包含非交易类关键词，跳过
+        val match = amountYuanPattern.find(combined)
+            ?: amountSymbolPattern.find(combined)
+            ?: autoDeductAmountPattern.find(combined)
+        if (match != null) {
+            val startIdx = maxOf(0, match.range.first - 10)
+            val endIdx = minOf(combined.length, match.range.last + 10)
+            val ctx = combined.substring(startIdx, endIdx)
+            if (nonTransactionAmountContexts.any { ctx.contains(it) }) return null
+        }
 
         // 判断收入还是支出
         val isIncome = incomeKeywords.any { combined.contains(it) }

@@ -19,6 +19,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.math.BigDecimal
+import java.math.RoundingMode
 
 class AddTransactionViewModel(
     private val transactionRepo: TransactionRepository,
@@ -204,26 +206,25 @@ class AddTransactionViewModel(
     private fun evaluateAndShow() {
         val v = _amount.value
         if (v.isEmpty()) return
-        // Remove trailing operator
         val expr = if (v.last() in listOf('+', '-')) v.dropLast(1) else v
         if (expr.isEmpty()) return
-        if (!expr.any { it == '+' || it == '-' }) return // no calculation needed
+        if (!expr.any { it == '+' || it == '-' }) return
 
         val result = evaluateExpression(expr) ?: return
-        _amount.value = result.toBigDecimal().stripTrailingZeros().toPlainString()
+        _amount.value = result.setScale(2, RoundingMode.HALF_UP).toPlainString()
         _showEquals.value = false
     }
 
-    private fun evaluateExpression(expr: String): Double? {
-        var result = 0.0
+    private fun evaluateExpression(expr: String): BigDecimal? {
+        var result = BigDecimal.ZERO
         var currentOp = '+'
         val numBuf = StringBuilder()
         for (ch in expr) {
             if (ch == '+' || ch == '-') {
-                val num = numBuf.toString().toDoubleOrNull() ?: return null
+                val num = numBuf.toString().toBigDecimalOrNull() ?: return null
                 result = when (currentOp) {
-                    '+' -> result + num
-                    '-' -> result - num
+                    '+' -> result.add(num)
+                    '-' -> result.subtract(num)
                     else -> result
                 }
                 currentOp = ch
@@ -232,10 +233,10 @@ class AddTransactionViewModel(
                 numBuf.append(ch)
             }
         }
-        val num = numBuf.toString().toDoubleOrNull() ?: return null
+        val num = numBuf.toString().toBigDecimalOrNull() ?: return null
         result = when (currentOp) {
-            '+' -> result + num
-            '-' -> result - num
+            '+' -> result.add(num)
+            '-' -> result.subtract(num)
             else -> result
         }
         return result
@@ -248,9 +249,9 @@ class AddTransactionViewModel(
         // Strip trailing operator and evaluate if needed
         val cleanExpr = if (expr.isNotEmpty() && expr.last() in listOf('+', '-')) expr.dropLast(1) else expr
         val amt = if (cleanExpr.any { it == '+' || it == '-' }) {
-            evaluateExpression(cleanExpr) ?: run { saveTriggered = false; return }
+            evaluateExpression(cleanExpr)?.setScale(2, RoundingMode.HALF_UP)?.toDouble() ?: run { saveTriggered = false; return }
         } else {
-            cleanExpr.toDoubleOrNull() ?: run { saveTriggered = false; return }
+            cleanExpr.toBigDecimalOrNull()?.setScale(2, RoundingMode.HALF_UP)?.toDouble() ?: run { saveTriggered = false; return }
         }
         if (amt <= 0) { saveTriggered = false; return }
         if (_selectedAccountId.value <= 0) { saveTriggered = false; return }
