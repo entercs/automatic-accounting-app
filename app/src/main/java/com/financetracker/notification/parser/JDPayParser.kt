@@ -18,9 +18,25 @@ class JDPayParser : NotificationParser {
     // 过滤掉优惠/礼金类金额的关键词
     private val excludeKeywords = listOf("礼金", "优惠", "抵扣", "红包", "叠加", "满减", "立减", "返现", "积分", "加赠", "券", "返利")
 
+    // 非交易类通知标题（营销/额度/账户类），一律不解析
+    private val nonTransactionTitles = listOf(
+        "白条额度变动提醒", "白条额度变动", "白条额度", "额度变动",
+        "额度提升", "额度调整", "提额", "优惠券", "京豆",
+        "服务通知", "账户通知"
+    )
+
     override fun parse(packageName: String, title: String, text: String): ParsedNotification? {
         if (packageName != "com.jingdong.app.mall") return null
         val combined = "$title $text"
+
+        // 非交易类标题直接跳过
+        if (nonTransactionTitles.any { title.contains(it) }) return null
+
+        // 整体包含额度提升/提额等营销关键词，跳过
+        if (combined.contains("额度提升") || combined.contains("额度已提升") ||
+            combined.contains("提额") || combined.contains("白条额度")) {
+            return null
+        }
 
         // 提取所有金额
         val amounts = mutableListOf<Double>()

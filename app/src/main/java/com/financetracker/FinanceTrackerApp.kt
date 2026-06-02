@@ -22,6 +22,7 @@ class FinanceTrackerApp : Application() {
             com.financetracker.di.AppModule.categoryRepository.seedIfEmpty()
             com.financetracker.di.AppModule.paymentAccountRepository.seedIfEmpty()
             com.financetracker.di.AppModule.paymentAccountRepository.fixAccountNames()
+            com.financetracker.di.AppModule.paymentAccountRepository.ensureBankAccount()
         }
     }
 

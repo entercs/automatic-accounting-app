@@ -48,7 +48,14 @@ class PaymentAccountRepository(private val dao: PaymentAccountDao) {
             listOf(
                 PaymentAccountEntity(1, "微信", "wechat", true, "#07C160"),
                 PaymentAccountEntity(2, "支付宝", "alipay", true, "#1677FF"),
+                PaymentAccountEntity(3, "银行卡", "bank", true, "#4CAF50"),
             ).forEach { dao.insert(it) }
+        }
+    }
+
+    suspend fun ensureBankAccount() {
+        if (dao.getByType("bank") == null) {
+            dao.insert(PaymentAccountEntity(name = "银行卡", type = "bank", color = "#4CAF50"))
         }
     }
 }

@@ -20,6 +20,8 @@ class AlipayParser : NotificationParser {
     private val amountYuanPattern = Regex("(\\d+\\.?\\d*)\\s*元")
     // 匹配 "¥12.50" 或 "￥12.50" 格式（兼容旧格式）
     private val amountSymbolPattern = Regex("[¥￥](\\d+\\.?\\d*)")
+    // 匹配 "人民币12.50元" 格式（银行通知）
+    private val amountRmbPattern = Regex("人民币\\s*(\\d+\\.?\\d*)")
     // 匹配 "你在某某有一笔" 格式
     private val merchantInlinePattern = Regex("你在(.+?)有一笔")
     // 匹配 "收款方: xxx" 格式（兼容旧格式）
@@ -32,18 +34,43 @@ class AlipayParser : NotificationParser {
 
     // 过滤非交易类金额的上下文关键词（需同时满足金额存在）
     private val nonTransactionAmountContexts = listOf(
-        "红包今晚失效", "红包即将失效", "补贴金额", "优惠券", "代金券",
-        "加赠", "返现", "返利"
+        "红包今晚失效", "红包即将失效", "红包", "补贴", "补贴金额",
+        "优惠券", "代金券", "积分", "加赠", "返现", "返利",
+        "提额", "额度", "提升"
+    )
+
+    // 非交易类通知标题（这些通知一律不解析）
+    private val nonTransactionTitles = listOf(
+        "支付宝卡包", "卡包", "红包", "优惠券", "积分",
+        "提额", "额度", "服务提醒"
     )
 
     override fun parse(packageName: String, title: String, text: String): ParsedNotification? {
         if (packageName !in supportedPackages) return null
+
+        // 标题为"支付宝卡包"等非交易类通知一律跳过
+        if (nonTransactionTitles.any { title.contains(it) }) {
+            // "交易提醒"是合法的；但"卡包"等其他是营销/通知类
+            if (title != "交易提醒" && title != "支付通知" && title != "收款通知") {
+                return null
+            }
+        }
+
         val combined = "$title $text"
+
+        // 标题整体若是"红包/优惠/额度"等纯营销类，跳过
+        if (combined.contains("红包失效") || combined.contains("红包即将失效") ||
+            combined.contains("提额") || combined.contains("额度提升")) {
+            return null
+        }
 
         // 提取金额
         var amount = amountYuanPattern.find(combined)?.groupValues?.get(1)?.toDoubleOrNull()
         if (amount == null) {
             amount = amountSymbolPattern.find(combined)?.groupValues?.get(1)?.toDoubleOrNull()
+        }
+        if (amount == null) {
+            amount = amountRmbPattern.find(combined)?.groupValues?.get(1)?.toDoubleOrNull()
         }
         if (amount == null) {
             amount = autoDeductAmountPattern.find(combined)?.groupValues?.get(1)?.toDoubleOrNull()
@@ -53,10 +80,11 @@ class AlipayParser : NotificationParser {
         // 如果金额对应的上下文包含非交易类关键词，跳过
         val match = amountYuanPattern.find(combined)
             ?: amountSymbolPattern.find(combined)
+            ?: amountRmbPattern.find(combined)
             ?: autoDeductAmountPattern.find(combined)
         if (match != null) {
-            val startIdx = maxOf(0, match.range.first - 10)
-            val endIdx = minOf(combined.length, match.range.last + 10)
+            val startIdx = maxOf(0, match.range.first - 12)
+            val endIdx = minOf(combined.length, match.range.last + 12)
             val ctx = combined.substring(startIdx, endIdx)
             if (nonTransactionAmountContexts.any { ctx.contains(it) }) return null
         }

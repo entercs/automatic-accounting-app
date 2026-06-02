@@ -1,5 +1,39 @@
 # 版本记录
 
+## 版本3 (commit: 当前HEAD)
+
+**提交时间**: 2026-06-02
+
+**功能更新**:
+1. **微信收款屏幕解析** - `ScreenContentParser` 新增 `receiveSuccessKeywords`（你已收款/已收款/收款成功/到账），自动识别微信收款页（含"你已收款"文案 + 金额），无需用户手动操作
+2. **支付宝营销通知过滤** - `AlipayParser` 新增 `nonTransactionTitles` 黑名单（支付宝卡包/卡包/红包/优惠券/积分/服务提醒等），跳过这些标题的通知避免误弹"检测到支付通知"提示
+3. **京东白条额度类通知过滤** - `JDPayParser` 新增 `nonTransactionTitles` 黑名单（白条额度变动/额度提升/提额等），避免"白条额度已提升2100元"被误记为支出
+4. **支付宝免密扣款通知稳健性提升** - `FinanceNotificationService` 读取 `EXTRA_BIG_TEXT` 和 `EXTRA_TEXT_LINES`，正确处理 BigTextStyle 通知的完整正文；`AlipayParser` 上下文窗口从 10 字符扩到 12 字符，更稳健地过滤"红包/补贴/积分"邻近干扰
+5. **招商银行入账通知识别** - `BankCardParser` 补全招行全部包名（`com.cmbchina.ccs.pluto` / `com.cmbc.ccs` / `com.cmbchina.pocket` / `cmb.pb`），新增"人民币X.XX元"金额格式，启动自动 seed "银行卡"账户，记录时按需补建
+6. **分类规则完善**
+   - "北京一卡通 / 上海公共交通卡 / 羊城通 / 深圳通 / 公交卡 / 一卡通 / 出行 / 打车 / 摩拜 / 美团单车 / 青桔 / 哈啰单车" 等归类为 **汽车交通**
+   - "招商银行 / 招行 / 入账 / 代发 / 工资 / 薪资 / 月薪 / 奖金 / 绩效" 等归类为 **工资收入**
+   - "退款 / 退货 / 报销 / 理赔" 等归类为 **退款报销**
+   - 分类器新增 `TransactionType` 参数，支出/收入走不同规则表
+7. **交易提醒商户提取** - `AlipayParser.merchantInlinePattern` 正确从"你在北京一卡通有一笔4.00元的免密/自动扣款支付"中提取商户"北京一卡通"（"10个支付宝积分"后缀不影响）
+8. **主页月度自动重置** - `HomeViewModel` 把 `monthStart`/`monthEnd` 改造为 `MonthRange` `StateFlow`，每分钟检查 + `ON_RESUME` 主动刷新，跨月时支出/结余自动重置
+
+**涉及文件**:
+- `app/src/main/java/com/financetracker/notification/ScreenContentParser.kt`
+- `app/src/main/java/com/financetracker/notification/parser/AlipayParser.kt`
+- `app/src/main/java/com/financetracker/notification/parser/JDPayParser.kt`
+- `app/src/main/java/com/financetracker/notification/parser/BankCardParser.kt`
+- `app/src/main/java/com/financetracker/notification/FinanceNotificationService.kt`
+- `app/src/main/java/com/financetracker/notification/classifier/AutoClassifier.kt`
+- `app/src/main/java/com/financetracker/data/repository/PaymentAccountRepository.kt`
+- `app/src/main/java/com/financetracker/FinanceTrackerApp.kt`
+- `app/src/main/java/com/financetracker/ui/screen/home/HomeViewModel.kt`
+- `app/src/main/java/com/financetracker/ui/screen/home/HomeScreen.kt`
+
+**APK**: `apk/20260602v1.apk`
+
+---
+
 ## 版本2 (commit: 7f5b393)
 
 **提交时间**: 2026-05-28

@@ -116,11 +116,15 @@ class FinanceNotificationService : AccessibilityService() {
         val title = notif?.extras?.getCharSequence(Notification.EXTRA_TITLE)?.toString() ?: ""
         val text = notif?.extras?.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: ""
         val subText = notif?.extras?.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString() ?: ""
+        // BigTextStyle 通知会把完整正文放在 EXTRA_BIG_TEXT，EXTRA_TEXT 只是摘要
+        val bigText = notif?.extras?.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString() ?: ""
+        val textLines = notif?.extras?.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)
+            ?.joinToString(" ") { it.toString() } ?: ""
 
-        val fullText = listOf(title, text, subText).filter { it.isNotBlank() }.joinToString(" ")
-        val finalText = fullText.ifBlank {
-            event.text.joinToString(" ") { it.toString() }
-        }
+        // 优先用 BigText，再叠加其他字段作为上下文
+        val finalText = listOf(title, bigText.ifBlank { text }, subText, textLines)
+            .filter { it.isNotBlank() }
+            .joinToString(" ")
 
         if (finalText.isBlank()) return
 
@@ -152,7 +156,7 @@ class FinanceNotificationService : AccessibilityService() {
                 recordTransaction(parsed, packageName)
                 showNotification("已自动记账", "${parsed.merchant} ${String.format("%.2f", parsed.amount)}")
             } else {
-                val hasPayHint = listOf("支付", "交易", "付款", "账单").any { it in title || it in text }
+                val hasPayHint = listOf("支付", "交易", "付款", "账单").any { it in title || it in text || it in finalText }
                 if (hasPayHint) {
                     showReminderNotification(packageName)
                 }
@@ -236,8 +240,14 @@ class FinanceNotificationService : AccessibilityService() {
         val db = com.financetracker.FinanceTrackerApp.instance.database
         // Match account by package name, fall back to parser's accountType
         val accountType = accountTypeForPackage(packageName) ?: parsed.accountType
-        val account = db.paymentAccountDao().getByType(accountType) ?: return
-        val categoryId = classifier.classify(parsed.merchant)
+        var account = db.paymentAccountDao().getByType(accountType)
+        // 银行账户若不存在则尝试自动创建一个
+        if (account == null && accountType == "bank") {
+            com.financetracker.di.AppModule.paymentAccountRepository.ensureBankAccount()
+            account = db.paymentAccountDao().getByType(accountType)
+        }
+        if (account == null) return
+        val categoryId = classifier.classify(parsed.merchant, parsed.transactionType)
 
         val transaction = com.financetracker.domain.model.Transaction(
             amount = parsed.amount,

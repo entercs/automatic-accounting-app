@@ -9,7 +9,10 @@ class BankCardParser : NotificationParser {
         "com.chinamworld.bocmbci",   // 中国银行
         "com.android.bankabc",       // 农业银行
         "com.chinamworld.main",      // 建设银行
-        "cmb.pb",                    // 招商银行
+        "cmb.pb",                    // 招商银行 (新版)
+        "com.cmbchina.ccs.pluto",    // 招商银行 (旧版/企业版)
+        "com.cmbc.ccs",              // 招商银行 (信用卡)
+        "com.cmbchina.pocket",       // 招商银行 (招行 App)
         "com.bankcomm.maidanba",     // 交通银行
         "com.psbc.mobilebank",       // 邮储银行
         "cn.gov.pbc.dcep",           // 数字人民币
@@ -24,24 +27,50 @@ class BankCardParser : NotificationParser {
     private val amountSymbolPattern = Regex("[¥￥](\\d+\\.?\\d*)")
     // 匹配 "12.50元" 格式
     private val amountYuanPattern = Regex("(\\d+\\.?\\d*)\\s*元")
+    // 匹配 "人民币12.50元" 格式（招行/部分银行用此格式）
+    private val amountRmbPattern = Regex("人民币\\s*(\\d+\\.?\\d*)")
     // 匹配尾号
     private val cardNoPattern = Regex("[尾号账户]+[为:：]?\\*?(\\d{4,6})")
     // 商户提取：在...消费/在...支付/在...扣款
     private val merchantAtPattern = Regex("在(.+?)(?:消费|支付|扣款|收款|入账)")
     // 商户提取：商户:xxx / 收款方:xxx
     private val merchantColonPattern = Regex("(?:商户|收款方|交易对方)[:：]\\s*(.+)")
+    // 招行入账提取：尾号XXXX的招行一卡通
+    private val merchantCmbPattern = Regex("尾号(\\d+)\\s*的\\s*(?:招行|招商)[^入]*?入账")
     // 日期提取
     private val datePattern = Regex("(\\d{1,4}[年/]\\d{1,2}[月/]\\d{1,2}[日]?\\s*\\d{1,2}:\\d{1,2})")
+
+    // 非交易类标题（账户/营销/积分/额度）一律跳过
+    private val nonTransactionTitles = listOf(
+        "额度", "积分", "优惠券", "理财", "活动", "营销",
+        "白条", "信用", "账单日", "还款提醒", "还款日",
+        "推广", "广告", "公告", "服务通知"
+    )
 
     override fun parse(packageName: String, title: String, text: String): ParsedNotification? {
         if (packageName !in supportedPackages) return null
 
+        // 非交易类标题直接跳过
+        if (nonTransactionTitles.any { title.contains(it) }) {
+            return null
+        }
+
         val combined = "$title $text"
+
+        // 整体包含额度提升/积分兑换等营销关键词，跳过
+        if (combined.contains("额度提升") || combined.contains("额度已提升") ||
+            combined.contains("提额") || combined.contains("积分兑换") ||
+            combined.contains("信用额度") || combined.contains("账单提醒")) {
+            return null
+        }
 
         // 提取金额
         var amount = amountSymbolPattern.find(combined)?.groupValues?.get(1)?.toDoubleOrNull()
         if (amount == null) {
             amount = amountYuanPattern.find(combined)?.groupValues?.get(1)?.toDoubleOrNull()
+        }
+        if (amount == null) {
+            amount = amountRmbPattern.find(combined)?.groupValues?.get(1)?.toDoubleOrNull()
         }
         if (amount == null || amount == 0.0) return null
 
@@ -50,9 +79,11 @@ class BankCardParser : NotificationParser {
         val type = if (isIncome) TransactionType.INCOME else TransactionType.EXPENSE
 
         // 提取商户
+        val cardNo = cardNoPattern.find(combined)?.groupValues?.get(1)?.trim()
         val merchant = merchantColonPattern.find(combined)?.groupValues?.get(1)?.trim()
             ?: merchantAtPattern.find(combined)?.groupValues?.get(1)?.trim()
-            ?: if (type == TransactionType.INCOME) "银行卡收入" else "银行卡消费"
+            ?: if (cardNo != null) "${title}尾号${cardNo}"
+            else if (type == TransactionType.INCOME) "${title}入账" else "银行卡消费"
 
         // 提取日期（如果解析失败会用当前时间）
         val payTime = datePattern.find(combined)?.groupValues?.get(1)?.trim()?.let {

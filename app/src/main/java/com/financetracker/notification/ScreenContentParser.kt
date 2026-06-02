@@ -15,10 +15,15 @@ class ScreenContentParser {
         Regex("(\\d+\\.?\\d*)\\s*元"),
     )
 
-    // Must contain at least one of these STRONG success keywords
+    // 支出支付成功关键词
     private val paySuccessKeywords = listOf(
         "支付成功", "付款成功", "交易成功",
         "扫码成功",
+    )
+
+    // 收款成功关键词（支持"你已收款""已收款""收款成功""到账"等微信/支付宝收款页文案）
+    private val receiveSuccessKeywords = listOf(
+        "你已收款", "已收款", "收款成功", "到账",
     )
 
     // Reject merchant names containing these garbage keywords
@@ -29,7 +34,10 @@ class ScreenContentParser {
     )
 
     fun hasPayKeywords(texts: List<String>): Boolean {
-        return texts.any { text -> paySuccessKeywords.any { kw -> kw in text } }
+        return texts.any { text ->
+            paySuccessKeywords.any { kw -> kw in text } ||
+                receiveSuccessKeywords.any { kw -> kw in text }
+        }
     }
 
     fun parse(packageName: String, root: AccessibilityNodeInfo?): ParsedNotification? {
@@ -65,11 +73,19 @@ class ScreenContentParser {
         // STRICT: amount must be reasonable
         if (amount <= 0.01 || amount > 100000) return null
 
+        // 判断收入还是支出
+        val isIncome = receiveSuccessKeywords.any { kw -> texts.any { it.contains(kw) } }
+        val type = if (isIncome) TransactionType.INCOME else TransactionType.EXPENSE
+
         // Extract merchant — try known patterns
         var merchant = ""
         val merchantPatterns = listOf(
             Regex("收款方[:：]\\s*(.+)"),
             Regex("商户[:：]\\s*(.+)"),
+            Regex("来自(.+?)的收款"),
+            Regex("(.+?)的收款"),
+            Regex("(.+?)向你转账"),
+            Regex("(.+?)已收到"),
             Regex("你在(.+?)有一笔"),
             Regex("向(.+?)(?:付款|支付|转账)"),
         )
@@ -100,9 +116,9 @@ class ScreenContentParser {
 
         if (merchant.isBlank()) {
             merchant = when {
-                packageName.contains("Alipay") -> "支付宝"
-                packageName.contains("tencent") -> "微信"
-                else -> "支付"
+                packageName.contains("Alipay") -> if (type == TransactionType.INCOME) "支付宝收入" else "支付宝"
+                packageName.contains("tencent") -> if (type == TransactionType.INCOME) "微信收入" else "微信"
+                else -> if (type == TransactionType.INCOME) "收款" else "支付"
             }
         }
 
@@ -113,7 +129,7 @@ class ScreenContentParser {
             else -> "bank"
         }
 
-        return ParsedNotification(amount, merchant, accountType, TransactionType.EXPENSE, System.currentTimeMillis())
+        return ParsedNotification(amount, merchant, accountType, type, System.currentTimeMillis())
     }
 
     private fun collectTexts(node: AccessibilityNodeInfo, maxNodes: Int): List<String> {
