@@ -77,7 +77,6 @@ fun SettingsScreen() {
     }
     val viewModel: SettingsViewModel = viewModel(factory = factory)
     val isAccessibilityEnabled by viewModel.isAccessibilityEnabled.collectAsState()
-    val isNotificationEnabled by viewModel.isNotificationEnabled.collectAsState()
     val accounts by viewModel.accounts.collectAsState()
     val exportState by viewModel.exportState.collectAsState()
     val feedback by viewModel.feedback.collectAsState()
@@ -425,16 +424,17 @@ fun SettingsScreen() {
                         Column(modifier = Modifier.weight(1f)) {
                             Text("自动记账", style = MaterialTheme.typography.bodyLarge)
                             Text(
-                                if (isAccessibilityEnabled) "无障碍已开启，正在监听"
-                                   else "无障碍未开启，点击开启",
+                                if (isAccessibilityEnabled) "无障碍已开启，正在监听通知和屏幕"
+                                   else "无障碍未开启，无法自动记账",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = if (isAccessibilityEnabled) Green500 else MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
+                        // Switch 反映真实无障碍状态，点击跳系统设置
                         Switch(
-                            checked = isNotificationEnabled,
-                            onCheckedChange = { enabled ->
-                                viewModel.toggleNotification(enabled)
+                            checked = isAccessibilityEnabled,
+                            onCheckedChange = { _ ->
+                                viewModel.openAccessibilitySettings()
                             },
                         )
                     }
@@ -446,9 +446,9 @@ fun SettingsScreen() {
                     Text("刷新无障碍状态")
                 }
                 TextButton(onClick = {
-                    context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                    viewModel.openAccessibilitySettings()
                 }) {
-                    Text("前往无障碍设置")
+                    Text(if (isAccessibilityEnabled) "管理无障碍设置" else "前往无障碍设置")
                 }
             }
 

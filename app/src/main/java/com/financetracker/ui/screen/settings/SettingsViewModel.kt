@@ -36,9 +36,6 @@ class SettingsViewModel(
     private val _isAccessibilityEnabled = MutableStateFlow(false)
     val isAccessibilityEnabled: StateFlow<Boolean> = _isAccessibilityEnabled.asStateFlow()
 
-    val isNotificationEnabled: StateFlow<Boolean> =
-        prefs.isNotificationEnabled.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
-
     val accounts: StateFlow<List<PaymentAccount>> =
         accountRepo.getAll().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -56,13 +53,12 @@ class SettingsViewModel(
         _isAccessibilityEnabled.value = isEnabled
     }
 
-    fun toggleNotification(enabled: Boolean) {
-        viewModelScope.launch {
-            prefs.setNotificationEnabled(enabled)
-            if (enabled) {
-                refreshAccessibilityStatus()
-            }
+    /** 打开系统无障碍设置页面 */
+    fun openAccessibilitySettings() {
+        val intent = Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
+        context.startActivity(intent)
     }
 
     private val _feedback = MutableStateFlow<String?>(null)
