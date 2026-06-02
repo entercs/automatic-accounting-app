@@ -10,6 +10,7 @@
 local.properties
 /app/build
 /app/release
+/apk/
 *.apk
 *.aab
 *.jks
