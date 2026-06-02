@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -49,6 +50,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -66,6 +68,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.financetracker.di.AppModule
@@ -95,7 +98,9 @@ fun HomeScreen(
         )
     }
     val viewModel: HomeViewModel = viewModel(factory = factory)
-    val recentTransactions by viewModel.recentTransactions.collectAsState()
+    val pagedTransactions by viewModel.pagedTransactions.collectAsState()
+    val hasMore by viewModel.hasMore.collectAsState()
+    val isLoadingMore by viewModel.isLoadingMore.collectAsState()
     val monthlyTransactions by viewModel.monthlyTransactions.collectAsState()
     val categories by viewModel.categories.collectAsState()
     val accounts by viewModel.accounts.collectAsState()
@@ -103,9 +108,10 @@ fun HomeScreen(
 
     val categoryMap = remember(categories) { categories.associateBy { it.id } }
     val accountMap = remember(accounts) { accounts.associateBy { it.id } }
-    val displayedTransactions = remember(recentTransactions, searchQuery) {
-        if (searchQuery.isBlank()) recentTransactions
-        else recentTransactions.filter { tx ->
+    // 统一用分页交易列表(初始为空时短暂显示空状态,首屏加载完即填充)
+    val displayedTransactions = remember(pagedTransactions, searchQuery) {
+        if (searchQuery.isBlank()) pagedTransactions
+        else pagedTransactions.filter { tx ->
             tx.merchant.contains(searchQuery, ignoreCase = true) ||
             tx.note.contains(searchQuery, ignoreCase = true) ||
             "%.2f".format(tx.amount).contains(searchQuery) ||
@@ -174,6 +180,34 @@ fun HomeScreen(
         val listState = rememberLazyListState()
         val scope = rememberCoroutineScope()
 
+        // 滚动到底部时自动加载更多
+        // 用 snapshotFlow 监听 listState 变化,使用 listState.layoutInfo.totalItemsCount（LazyColumn 真实总数）作为分母,
+        // 这样分页加载后总数增长也能正确触发。
+        LaunchedEffect(listState) {
+            snapshotFlow {
+                val info = listState.layoutInfo
+                val lastVisible = info.visibleItemsInfo.lastOrNull()?.index ?: 0
+                lastVisible to info.totalItemsCount
+            }.collect { (lastVisible, total) ->
+                // 距底部 3 项内时触发
+                if (hasMore && !isLoadingMore && total > 0 && lastVisible >= total - 3) {
+                    viewModel.loadMore()
+                }
+            }
+        }
+
+        // 当分页数据增长时也立即检查一次(防止"已到底但新数据未刷新"边界情况)
+        LaunchedEffect(pagedTransactions.size) {
+            if (hasMore && !isLoadingMore && pagedTransactions.isNotEmpty()) {
+                val info = listState.layoutInfo
+                val lastVisible = info.visibleItemsInfo.lastOrNull()?.index ?: 0
+                val total = info.totalItemsCount
+                if (total > 0 && lastVisible >= total - 3) {
+                    viewModel.loadMore()
+                }
+            }
+        }
+
         // Initially scroll past the search bar (item 0) to hide it
         LaunchedEffect(Unit) {
             listState.scrollToItem(1, 0)
@@ -234,20 +268,25 @@ fun HomeScreen(
             if (displayedTransactions.isEmpty()) {
                 item {
                     Box(modifier = Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) {
-                        Text("还没有交易记录\n点击右下角按钮开始记账", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            if (isLoadingMore) "加载中…" else "还没有交易记录\n点击右下角按钮开始记账",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 }
             }
 
-            items(flatItems.size, key = { index ->
-                val item = flatItems[index]
-                when (item) {
-                    is com.financetracker.ui.component.DailyGroup -> "h_${item.dateLabel}"
-                    is com.financetracker.domain.model.Transaction -> "tx_${item.id}"
-                    else -> "unknown"
+            itemsIndexed(
+                items = flatItems,
+                key = { index, item ->
+                    when (item) {
+                        is com.financetracker.ui.component.DailyGroup -> "h_${index}_${item.dateLabel}"
+                        is com.financetracker.domain.model.Transaction -> "tx_${index}_${item.id}"
+                        else -> "u_${index}"
+                    }
                 }
-            }) { index ->
-                when (val item = flatItems[index]) {
+            ) { index, it ->
+                when (val item = it) {
                     is com.financetracker.ui.component.DailyGroup -> {
                         DateHeader(item.dateLabel, item.totalExpense, item.totalIncome)
                     }
@@ -278,6 +317,27 @@ fun HomeScreen(
             }
 
             item { Spacer(modifier = Modifier.height(80.dp)) }
+
+            // 加载更多指示器
+            if (isLoadingMore) {
+                item {
+                    Box(
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text("加载中…", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
+                    }
+                }
+            } else if (!hasMore && pagedTransactions.isNotEmpty()) {
+                item {
+                    Box(
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text("— 已加载全部 ${pagedTransactions.size} 条 —", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                    }
+                }
+            }
             }
         }
     }

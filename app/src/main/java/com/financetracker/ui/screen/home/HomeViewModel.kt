@@ -27,6 +27,10 @@ class HomeViewModel(
     accountRepo: PaymentAccountRepository,
 ) : ViewModel() {
 
+    companion object {
+        private const val PAGE_SIZE = 20
+    }
+
     data class MonthRange(val start: Long, val end: Long)
 
     private fun currentMonthRange(): MonthRange {
@@ -80,6 +84,55 @@ class HomeViewModel(
     val accounts: StateFlow<List<PaymentAccount>> =
         accountRepo.getAll().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    // ====== 分页加载：交易列表 ======
+    // 累计已加载的首页交易
+    private val _pagedTransactions = MutableStateFlow<List<Transaction>>(emptyList())
+    val pagedTransactions: StateFlow<List<Transaction>> = _pagedTransactions.asStateFlow()
+
+    // 是否有更多
+    private val _hasMore = MutableStateFlow(true)
+    val hasMore: StateFlow<Boolean> = _hasMore.asStateFlow()
+
+    // 正在加载（防止重复触发）
+    private val _isLoadingMore = MutableStateFlow(false)
+    val isLoadingMore: StateFlow<Boolean> = _isLoadingMore.asStateFlow()
+
+    // 数据变化信号（删除/添加后递增,触发重置）
+    private val _dataVersion = MutableStateFlow(0)
+    val dataVersion: StateFlow<Int> = _dataVersion.asStateFlow()
+
+    init {
+        // 首次加载第一页
+        loadFirstPage()
+    }
+
+    /** 重置并加载第一页（删除/添加/月份变更后调用） */
+    fun loadFirstPage() {
+        viewModelScope.launch {
+            _pagedTransactions.value = transactionRepo.getByPage(PAGE_SIZE, 0)
+            _hasMore.value = _pagedTransactions.value.size >= PAGE_SIZE &&
+                transactionRepo.getCount() > PAGE_SIZE
+        }
+    }
+
+    /** 加载下一页（滚动到底时调用） */
+    fun loadMore() {
+        if (_isLoadingMore.value || !_hasMore.value) return
+        _isLoadingMore.value = true
+        viewModelScope.launch {
+            val offset = _pagedTransactions.value.size
+            val newPage = transactionRepo.getByPage(PAGE_SIZE, offset)
+            if (newPage.isEmpty()) {
+                _hasMore.value = false
+            } else {
+                _pagedTransactions.value = _pagedTransactions.value + newPage
+                _hasMore.value = newPage.size >= PAGE_SIZE
+            }
+            _isLoadingMore.value = false
+        }
+    }
+
+    // ====== 删除/撤销 ======
     private val _deletedTransaction = MutableStateFlow<Transaction?>(null)
     val deletedTransaction: StateFlow<Transaction?> = _deletedTransaction.asStateFlow()
 
@@ -87,6 +140,9 @@ class HomeViewModel(
         viewModelScope.launch {
             transactionRepo.delete(transaction)
             _deletedTransaction.value = transaction
+            // 触发分页重载
+            _dataVersion.value = _dataVersion.value + 1
+            loadFirstPage()
         }
     }
 
@@ -95,6 +151,9 @@ class HomeViewModel(
         viewModelScope.launch {
             transactionRepo.add(transaction.copy(id = 0))
             _deletedTransaction.value = null
+            // 触发分页重载
+            _dataVersion.value = _dataVersion.value + 1
+            loadFirstPage()
         }
     }
 

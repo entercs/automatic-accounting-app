@@ -25,6 +25,16 @@ interface TransactionDao {
     @Query("SELECT * FROM transactions ORDER BY date DESC LIMIT :limit")
     fun getRecent(limit: Int = 10): Flow<List<TransactionEntity>>
 
+    /**
+     * 分页查询:按日期倒序,跳过前 offset 条,取 limit 条
+     * offset 从 0 开始
+     */
+    @Query("SELECT * FROM transactions ORDER BY date DESC LIMIT :limit OFFSET :offset")
+    suspend fun getByPage(limit: Int, offset: Int): List<TransactionEntity>
+
+    @Query("SELECT COUNT(*) FROM transactions")
+    suspend fun count(): Int
+
     @Query("SELECT * FROM transactions WHERE date >= :startOfMonth AND date < :endOfMonth ORDER BY date DESC")
     fun getByMonth(startOfMonth: Long, endOfMonth: Long): Flow<List<TransactionEntity>>
 

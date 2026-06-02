@@ -16,6 +16,13 @@ class TransactionRepository(
     fun getRecent(limit: Int = 10): Flow<List<Transaction>> =
         dao.getRecent(limit).mapToDomain()
 
+    /** 分页加载:按日期倒序,返回 offset..offset+limit 范围的交易 */
+    suspend fun getByPage(limit: Int, offset: Int): List<Transaction> =
+        dao.getByPage(limit, offset).map { it.toDomain() }
+
+    /** 交易总数,用于分页结束判断 */
+    suspend fun getCount(): Int = dao.count()
+
     fun getByMonth(startOfMonth: Long, endOfMonth: Long): Flow<List<Transaction>> =
         dao.getByMonth(startOfMonth, endOfMonth).mapToDomain()
 
