@@ -17,6 +17,9 @@ class FinanceTrackerApp : Application() {
         instance = this
         database = com.financetracker.data.db.AppDatabase.create(this)
 
+        // 注册全局无障碍服务状态监听器(1.0.4 新增)
+        com.financetracker.notification.AccessibilityStateHolder.initialize(this)
+
         // Auto-initialize default data on first launch
         appScope.launch {
             com.financetracker.di.AppModule.categoryRepository.seedIfEmpty()

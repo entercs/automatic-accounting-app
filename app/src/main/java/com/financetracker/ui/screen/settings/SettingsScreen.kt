@@ -89,11 +89,6 @@ fun SettingsScreen() {
         }
     }
 
-    // 每次进入设置页都刷新无障碍状态
-    LaunchedEffect(Unit) {
-        viewModel.refreshAccessibilityStatus()
-    }
-
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
@@ -440,11 +435,6 @@ fun SettingsScreen() {
                     }
                 }
                 Spacer(modifier = Modifier.height(4.dp))
-                TextButton(onClick = {
-                    viewModel.refreshAccessibilityStatus()
-                }) {
-                    Text("刷新无障碍状态")
-                }
                 TextButton(onClick = {
                     viewModel.openAccessibilitySettings()
                 }) {

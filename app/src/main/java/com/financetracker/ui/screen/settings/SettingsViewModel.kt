@@ -1,10 +1,8 @@
 package com.financetracker.ui.screen.settings
 
-import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.view.accessibility.AccessibilityManager
 import androidx.core.content.FileProvider
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -14,7 +12,7 @@ import com.financetracker.data.repository.CategoryRepository
 import com.financetracker.data.repository.PaymentAccountRepository
 import com.financetracker.data.repository.TransactionRepository
 import com.financetracker.domain.model.PaymentAccount
-import com.financetracker.notification.FinanceNotificationService
+import com.financetracker.notification.AccessibilityStateHolder
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -33,25 +31,14 @@ class SettingsViewModel(
     private val context: Context,
 ) : ViewModel() {
 
-    private val _isAccessibilityEnabled = MutableStateFlow(false)
-    val isAccessibilityEnabled: StateFlow<Boolean> = _isAccessibilityEnabled.asStateFlow()
+    // 订阅全局无障碍状态(由 AccessibilityStateHolder 维护,实时反映系统设置变更)
+    val isAccessibilityEnabled: StateFlow<Boolean> = AccessibilityStateHolder.isEnabled
 
     val accounts: StateFlow<List<PaymentAccount>> =
         accountRepo.getAll().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val _exportState = MutableStateFlow<ExportState>(ExportState.Idle)
     val exportState: StateFlow<ExportState> = _exportState.asStateFlow()
-
-    init {
-        refreshAccessibilityStatus()
-    }
-
-    fun refreshAccessibilityStatus() {
-        val accessibilityManager = context.getSystemService(Context.ACCESSIBILITY_SERVICE) as AccessibilityManager
-        val enabledServices = accessibilityManager.getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_GENERIC)
-        val isEnabled = enabledServices.any { it.id?.contains("FinanceNotification") == true }
-        _isAccessibilityEnabled.value = isEnabled
-    }
 
     /** 打开系统无障碍设置页面 */
     fun openAccessibilitySettings() {
