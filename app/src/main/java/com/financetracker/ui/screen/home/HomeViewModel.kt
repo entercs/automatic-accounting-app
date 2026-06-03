@@ -118,14 +118,17 @@ class HomeViewModel(
     /** 加载下一页（滚动到底时调用） */
     fun loadMore() {
         if (_isLoadingMore.value || !_hasMore.value) return
+        // 1.0.5 防御: pagedTransactions 为空时直接返回(防止 init 阶段 snapshotFlow 误触发导致 offset=0 重复加载)
+        val current = _pagedTransactions.value
+        if (current.isEmpty()) return
         _isLoadingMore.value = true
         viewModelScope.launch {
-            val offset = _pagedTransactions.value.size
+            val offset = current.size
             val newPage = transactionRepo.getByPage(PAGE_SIZE, offset)
             if (newPage.isEmpty()) {
                 _hasMore.value = false
             } else {
-                _pagedTransactions.value = _pagedTransactions.value + newPage
+                _pagedTransactions.value = current + newPage
                 _hasMore.value = newPage.size >= PAGE_SIZE
             }
             _isLoadingMore.value = false

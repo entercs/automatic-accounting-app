@@ -137,12 +137,13 @@ fun HomeScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     var revealedTransactionId by remember { mutableStateOf<Long?>(null) }
 
-    // 屏幕恢复时主动刷新当月范围，确保跨月时支出/结余立刻重置
+    // 屏幕恢复时主动刷新当月范围 + 分页列表(从 Add 页面返回时拉取新记录)
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 viewModel.refreshMonthRange()
+                viewModel.loadFirstPage()  // 1.0.5 修复：返回首页时刷新分页列表
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -181,28 +182,15 @@ fun HomeScreen(
         val scope = rememberCoroutineScope()
 
         // 滚动到底部时自动加载更多
-        // 用 snapshotFlow 监听 listState 变化,使用 listState.layoutInfo.totalItemsCount（LazyColumn 真实总数）作为分母,
-        // 这样分页加载后总数增长也能正确触发。
+        // 用 snapshotFlow 监听 listState 变化,滚动到接近底部时自动加载
+        // 1.0.5 修复: 加 pagedTransactions.isNotEmpty() 防御,防止 init 阶段 LazyColumn 初次 layout 时 totalItemsCount 偏小误触发
         LaunchedEffect(listState) {
             snapshotFlow {
                 val info = listState.layoutInfo
                 val lastVisible = info.visibleItemsInfo.lastOrNull()?.index ?: 0
                 lastVisible to info.totalItemsCount
             }.collect { (lastVisible, total) ->
-                // 距底部 3 项内时触发
-                if (hasMore && !isLoadingMore && total > 0 && lastVisible >= total - 3) {
-                    viewModel.loadMore()
-                }
-            }
-        }
-
-        // 当分页数据增长时也立即检查一次(防止"已到底但新数据未刷新"边界情况)
-        LaunchedEffect(pagedTransactions.size) {
-            if (hasMore && !isLoadingMore && pagedTransactions.isNotEmpty()) {
-                val info = listState.layoutInfo
-                val lastVisible = info.visibleItemsInfo.lastOrNull()?.index ?: 0
-                val total = info.totalItemsCount
-                if (total > 0 && lastVisible >= total - 3) {
+                if (hasMore && !isLoadingMore && pagedTransactions.isNotEmpty() && total > 0 && lastVisible >= total - 3) {
                     viewModel.loadMore()
                 }
             }

@@ -26,6 +26,13 @@ class ScreenContentParser {
         "你已收款", "已收款", "收款成功", "到账",
     )
 
+    // 微信红包已领取关键词（1.0.5 新增:微信红包没有通知,只能靠屏幕捕获）
+    // 红包被拆开的页面会显示 "你已领取"/"已存入零钱"/"恭喜发财,大吉大利" 等
+    private val redPacketKeywords = listOf(
+        "已存入零钱", "存入零钱", "已到账", "已领取", "你已领取",
+        "微信红包", "恭喜发财",
+    )
+
     // Reject merchant names containing these garbage keywords
     private val garbageKeywords = listOf(
         "刷新", "搜索", "天气", "℃", "车险", "更多操作", "松开",
@@ -36,7 +43,8 @@ class ScreenContentParser {
     fun hasPayKeywords(texts: List<String>): Boolean {
         return texts.any { text ->
             paySuccessKeywords.any { kw -> kw in text } ||
-                receiveSuccessKeywords.any { kw -> kw in text }
+                receiveSuccessKeywords.any { kw -> kw in text } ||
+                redPacketKeywords.any { kw -> kw in text }
         }
     }
 
@@ -73,8 +81,9 @@ class ScreenContentParser {
         // STRICT: amount must be reasonable
         if (amount <= 0.01 || amount > 100000) return null
 
-        // 判断收入还是支出
-        val isIncome = receiveSuccessKeywords.any { kw -> texts.any { it.contains(kw) } }
+        // 判断收入还是支出(1.0.5: 红包已领取/已存入零钱 也算收入)
+        val isRedPacket = redPacketKeywords.any { kw -> texts.any { it.contains(kw) } }
+        val isIncome = receiveSuccessKeywords.any { kw -> texts.any { it.contains(kw) } } || isRedPacket
         val type = if (isIncome) TransactionType.INCOME else TransactionType.EXPENSE
 
         // Extract merchant — try known patterns
@@ -82,7 +91,7 @@ class ScreenContentParser {
         val merchantPatterns = listOf(
             Regex("收款方[:：]\\s*(.+)"),
             Regex("商户[:：]\\s*(.+)"),
-            Regex("来自(.+?)的收款"),
+            Regex("来自(.+?)的(?:收款|红包)"),
             Regex("(.+?)的收款"),
             Regex("(.+?)向你转账"),
             Regex("(.+?)已收到"),
@@ -117,7 +126,11 @@ class ScreenContentParser {
         if (merchant.isBlank()) {
             merchant = when {
                 packageName.contains("Alipay") -> if (type == TransactionType.INCOME) "支付宝收入" else "支付宝"
-                packageName.contains("tencent") -> if (type == TransactionType.INCOME) "微信收入" else "微信"
+                packageName.contains("tencent") -> when {
+                    isRedPacket -> "微信红包"
+                    type == TransactionType.INCOME -> "微信收入"
+                    else -> "微信"
+                }
                 else -> if (type == TransactionType.INCOME) "收款" else "支付"
             }
         }

@@ -2,6 +2,7 @@
 
 | 版本 | 日期 | 更新内容 |
 |------|------|----------|
+| 1.0.5 | 2026-06-03 | 首页分页加载双重记录修复：发现 `loadMore` 在初始化阶段被错误触发（LazyColumn 初次 layout 时 `totalItemsCount` 偏小，导致 `lastVisible >= total-3` 误判），offset=0 又把 0-20 条加载一遍，结果首页每个交易都出现 2 次；新增 `loadMore` 空列表防御 + `snapshotFlow` 加 `pagedTransactions.isNotEmpty()` 校验 + 删除冗余 effect。微信红包自动记录：微信红包没有通知栏通知（用户补充），主要靠屏幕内容捕获识别 — `ScreenContentParser` 新增 `redPacketKeywords`（已存入零钱/已到账/已领取/微信红包/恭喜发财），红包被拆开页面被捕获时自动入账；`WeChatPayParser` 关键词扩充作为通知栏场景的兜底。首页 ON_RESUME 刷新：用户从"+"加完记录返回首页时，`pagedTransactions` 立即重载，新记录立刻显示在列表顶部 |
 | 1.0.4 | 2026-06-02 | 无障碍状态实时同步：新增 `AccessibilityStateHolder` 全局单例，`FinanceTrackerApp.onCreate` 注册 `AccessibilityManager.addAccessibilityStateChangeListener` 监听系统无障碍变更；用户在系统设置开关无障碍服务后，返回 APP 状态自动更新，**无需点刷新按钮**；同时删除 1.0.3 的"刷新无障碍状态"按钮（已被全局监听器取代）|
 | 1.0.3 | 2026-06-02 | "我的"页"自动记账" Switch 修复：原 Switch 状态绑定到无意义的 `isNotificationEnabled` preference（FinanceNotificationService 实际从不读这个值），导致 Switch 亮但无障碍没开/或者 Switch 灰但实际在监听——双重误导。现 Switch 直接绑定系统无障碍服务真实状态，点击 Switch 跳系统无障碍设置；副文字精确反映状态（"无障碍已开启，正在监听通知和屏幕" / "无障碍未开启，无法自动记账"）；删除无用 `isNotificationEnabled` preference |
 | 1.0.2 | 2026-06-02 | 首页交易列表分页加载：滚动到底前 3 项自动触发加载下一页，每页 20 条；底部显示"加载中…"和"已加载全部 N 条"；删除/撤销后自动重载；移除 `derivedStateOf` 闭包陷阱，改用 `snapshotFlow` + `listState.layoutInfo.totalItemsCount` 准确判断滚动位置；修复首页因 20 条硬编码限制导致的"之前的记录不见了"感知问题（数据库 82 条全部可滚动查看）|
