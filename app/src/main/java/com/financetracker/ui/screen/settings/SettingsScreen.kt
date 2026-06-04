@@ -38,6 +38,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -48,14 +49,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.financetracker.di.AppModule
 import com.financetracker.domain.model.Banks
+import com.financetracker.notification.AccessibilityStateHolder
 import com.financetracker.ui.component.AccountLogo
 import com.financetracker.ui.component.BalanceKeypad
 import com.financetracker.ui.theme.AccountIconDisplay
@@ -87,6 +92,19 @@ fun SettingsScreen() {
             snackbarHostState.showSnackbar(it)
             viewModel.clearFeedback()
         }
+    }
+
+    // 修复 Bug 1: 每次从系统无障碍设置返回本页面时,主动重新查询无障碍状态
+    // (addAccessibilityStateChangeListener 在某些 ROM 上对单服务的开关不可靠)
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                AccessibilityStateHolder.refresh()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     Scaffold(

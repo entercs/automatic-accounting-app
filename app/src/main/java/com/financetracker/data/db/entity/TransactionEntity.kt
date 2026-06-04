@@ -8,12 +8,8 @@ import androidx.room.PrimaryKey
 @Entity(
     tableName = "transactions",
     foreignKeys = [
-        ForeignKey(
-            entity = CategoryEntity::class,
-            parentColumns = ["id"],
-            childColumns = ["categoryId"],
-            onDelete = ForeignKey.RESTRICT,
-        ),
+        // 注意:categoryId 不再设外键。转账(TRANSFER)没有语义上的分类,
+        // 写 -1L 作为占位即可,无需与 categories 表保持引用完整性。
         ForeignKey(
             entity = PaymentAccountEntity::class,
             parentColumns = ["id"],
