@@ -16,13 +16,14 @@ class JDPayParser : NotificationParser {
     private val amountYuanPattern = Regex("(\\d+\\.?\\d*)\\s*元")
 
     // 过滤掉优惠/礼金类金额的关键词
-    private val excludeKeywords = listOf("礼金", "优惠", "抵扣", "红包", "叠加", "满减", "立减", "返现", "积分", "加赠", "券", "返利")
+    private val excludeKeywords = listOf("礼金", "优惠", "抵扣", "红包", "叠加", "满减", "立减", "返现", "积分", "加赠", "券", "返利", "抵", "京豆")
 
     // 非交易类通知标题（营销/额度/账户类），一律不解析
     private val nonTransactionTitles = listOf(
         "白条额度变动提醒", "白条额度变动", "白条额度", "额度变动",
         "额度提升", "额度调整", "提额", "优惠券", "京豆",
-        "服务通知", "账户通知"
+        "服务通知", "账户通知", "评价提醒", "评价", "晒单", "签到",
+        "活动", "营销", "推广", "广告", "公告"
     )
 
     override fun parse(packageName: String, title: String, text: String): ParsedNotification? {

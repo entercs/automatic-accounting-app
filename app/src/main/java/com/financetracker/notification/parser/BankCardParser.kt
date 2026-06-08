@@ -35,8 +35,10 @@ class BankCardParser : NotificationParser {
     private val merchantAtPattern = Regex("在(.+?)(?:消费|支付|扣款|收款|入账)")
     // 商户提取：商户:xxx / 收款方:xxx
     private val merchantColonPattern = Regex("(?:商户|收款方|交易对方)[:：]\\s*(.+)")
-    // 招行入账提取：尾号XXXX的招行一卡通
+    // 招行入账提取：尾号XXXX的招行一卡通入账
     private val merchantCmbPattern = Regex("尾号(\\d+)\\s*的\\s*(?:招行|招商)[^入]*?入账")
+    // 招行入账文本格式："您尾号2741的招行一卡通入账人民币X元"  提取"尾号2741"作商户标签
+    private val cmbAccountLabelPattern = Regex("尾号(\\d+)")
     // 日期提取
     private val datePattern = Regex("(\\d{1,4}[年/]\\d{1,2}[月/]\\d{1,2}[日]?\\s*\\d{1,2}:\\d{1,2})")
 
@@ -80,10 +82,20 @@ class BankCardParser : NotificationParser {
 
         // 提取商户
         val cardNo = cardNoPattern.find(combined)?.groupValues?.get(1)?.trim()
+        // 1.0.7 修复: 招行入账通知中 merchantAtPattern 无法匹配"尾号2741的招行一卡通入账"(没有"在"字),
+        // 用 cmbAccountLabelPattern 提取尾号作为招行入账的兜底商户标签
+        val cmbMatch = cmbAccountLabelPattern.find(combined)
         val merchant = merchantColonPattern.find(combined)?.groupValues?.get(1)?.trim()
             ?: merchantAtPattern.find(combined)?.groupValues?.get(1)?.trim()
-            ?: if (cardNo != null) "${title}尾号${cardNo}"
-            else if (type == TransactionType.INCOME) "${title}入账" else "银行卡消费"
+            ?: if (cmbMatch != null && combined.contains("入账") && (title.contains("招商") || title.contains("招行"))) {
+                "${title}尾号${cmbMatch.groupValues[1]}"
+            } else if (cardNo != null) {
+                "${title}尾号${cardNo}"
+            } else if (type == TransactionType.INCOME) {
+                "${title}入账"
+            } else {
+                "银行卡消费"
+            }
 
         // 提取日期（如果解析失败会用当前时间）
         val payTime = datePattern.find(combined)?.groupValues?.get(1)?.trim()?.let {

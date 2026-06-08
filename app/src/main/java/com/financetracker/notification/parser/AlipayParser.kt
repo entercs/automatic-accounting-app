@@ -11,10 +11,10 @@ class AlipayParser : NotificationParser {
         "hk.alipay.wallet",
     )
 
-    // 收入关键词
-    private val incomeKeywords = listOf("收款", "入账", "到账", "转入", "存入", "收入", "奖励", "红包", "退款", "提现到账", "收到")
+    // 收入关键词（注意:不再包含"红包",因为"支付红包/花呗红包"等场景下红包是支出场景,易误判）
+    private val incomeKeywords = listOf("收款", "入账", "到账", "转入", "存入", "收入", "奖励", "退款", "提现到账", "收到")
     // 支出关键词
-    private val expenseKeywords = listOf("支付", "付款", "消费", "转出", "提现", "还款", "转账", "免密", "自动扣款", "代扣")
+    private val expenseKeywords = listOf("支付", "付款", "消费", "转出", "提现", "还款", "转账", "免密", "自动扣款", "代扣", "支出")
 
     // 匹配 "12.50元" 或 "12元" 格式
     private val amountYuanPattern = Regex("(\\d+\\.?\\d*)\\s*元")
@@ -42,7 +42,8 @@ class AlipayParser : NotificationParser {
     // 非交易类通知标题（这些通知一律不解析）
     private val nonTransactionTitles = listOf(
         "支付宝卡包", "卡包", "红包", "优惠券", "积分",
-        "提额", "额度", "服务提醒"
+        "提额", "额度", "服务提醒", "登录提醒", "登录",
+        "签约成功通知", "验证码", "活动", "营销", "推广", "广告", "公告"
     )
 
     override fun parse(packageName: String, title: String, text: String): ParsedNotification? {
@@ -89,8 +90,9 @@ class AlipayParser : NotificationParser {
             if (nonTransactionAmountContexts.any { ctx.contains(it) }) return null
         }
 
-        // 判断收入还是支出
-        val isIncome = incomeKeywords.any { combined.contains(it) }
+        // 判断收入还是支出（1.0.7 修复：优先看明确的支出信号,避免"小荷包支付红包"等"红包"误判为收入）
+        val isExpense = expenseKeywords.any { combined.contains(it) }
+        val isIncome = !isExpense && incomeKeywords.any { combined.contains(it) }
         val type = if (isIncome) TransactionType.INCOME else TransactionType.EXPENSE
 
         // 提取商户

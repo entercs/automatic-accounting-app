@@ -44,6 +44,20 @@ class FinanceNotificationService : AccessibilityService() {
     // 金额去重窗口（毫秒）
     private val amountDedupWindowMs = 30_000L
 
+    // 已知明确是支付类通知的标题（严格相等才弹手动记账提醒）
+    private val payReminderTitles = setOf(
+        "交易提醒", "支付通知", "支付成功", "支付完成", "付款成功", "付款通知",
+        "收款通知", "收款成功", "到账通知", "扣款通知", "消费提醒", "入账通知",
+    )
+
+    // 已知明确是非支付类通知的特征(子串匹配) - 命中其一则不弹手动记账提醒
+    private val nonPaySignals = setOf(
+        "登录", "登录提醒", "卡包", "优惠券", "优惠券到期", "红包", "积分",
+        "额度", "提额", "签到", "推广", "签约", "签约成功", "广告",
+        "活动", "营销", "公告", "服务通知", "账户通知", "验证码",
+        "评价", "晒单", "京豆"
+    )
+
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
         val packageName = event.packageName?.toString() ?: return
         val isPaymentApp = parsers.any { packageName in it.supportedPackages }
@@ -156,8 +170,11 @@ class FinanceNotificationService : AccessibilityService() {
                 recordTransaction(parsed, packageName)
                 showNotification("已自动记账", "${parsed.merchant} ${String.format("%.2f", parsed.amount)}")
             } else {
-                val hasPayHint = listOf("支付", "交易", "付款", "账单").any { it in title || it in text || it in finalText }
-                if (hasPayHint) {
+                // 1.0.7 修复: 弹手动记账提醒的条件从"含支付/交易/付款/账单任意关键词"收窄为"标题明确是已知支付类"
+                // 避免登录提醒/卡包/优惠券等非支付消息被误弹
+                val isKnownPayTitle = payReminderTitles.any { it == title }
+                val isNonPay = nonPaySignals.any { it in title || it in text }
+                if (isKnownPayTitle && !isNonPay) {
                     showReminderNotification(packageName)
                 }
             }
