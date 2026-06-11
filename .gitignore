@@ -20,3 +20,5 @@ local.properties
 /bugs.txt
 /bugs-photo/
 /scripts/
+# 1.0.8+ 调整: CHANGELOG.md 只本地维护,精确技术细节不入 git(用户视角说明在 apk/最新版本.md)
+/CHANGELOG.md
