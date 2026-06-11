@@ -15,8 +15,10 @@ class JDPayParser : NotificationParser {
     private val amountSymbolPattern = Regex("[¥￥](\\d+\\.?\\d*)")
     private val amountYuanPattern = Regex("(\\d+\\.?\\d*)\\s*元")
 
-    // 过滤掉优惠/礼金类金额的关键词
-    private val excludeKeywords = listOf("礼金", "优惠", "抵扣", "红包", "叠加", "满减", "立减", "返现", "积分", "加赠", "券", "返利", "抵", "京豆")
+    // 过滤掉优惠/礼金/会员省钱类金额的关键词
+    private val excludeKeywords = listOf("礼金", "优惠", "抵扣", "红包", "叠加", "满减", "立减", "返现", "积分", "加赠", "券", "返利", "抵", "京豆",
+        // 1.0.8 修复: 排除京东 PLUS 会员省钱金额等营销内容(如"PLUS 会员省钱金额已达 621.86 元"被误识别为消费)
+        "PLUS", "省钱金额", "省回", "会费", "权益", "会员")
 
     // 非交易类通知标题（营销/额度/账户类），一律不解析
     private val nonTransactionTitles = listOf(

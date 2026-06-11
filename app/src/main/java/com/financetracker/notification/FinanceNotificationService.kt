@@ -34,8 +34,11 @@ class FinanceNotificationService : AccessibilityService() {
     private var lastScreenCaptureTime = 0L
     private var lastScreenCaptureHash = 0
 
-    // Global dedup: prevent same amount from being recorded twice within 30s
-    private val recentRecordedAmounts = mutableMapOf<Double, Long>()
+    // 1.0.8 修复: 去重 key 改为 (amount, transactionType) 二元组
+    // 原因:原 key 只有 amount,导致"同金额的支出(花呗付款 23.40)和收入(平台退款 23.40)"会互相去重,
+    //      退款收入被 30s 窗口吞掉,通知弹了但没写库(用户截图3+4 的场景)
+    private data class DedupKey(val amount: Double, val type: String)
+    private val recentRecordedAmounts = mutableMapOf<DedupKey, Long>()
     private val recentNotificationHashes = mutableMapOf<Int, Long>()
     private val dedupMutex = Mutex()
 
@@ -245,14 +248,21 @@ class FinanceNotificationService : AccessibilityService() {
     ) {
         val now = System.currentTimeMillis()
 
-        // Atomic dedup: only one coroutine can pass for the same amount
+        // 1.0.8 修复: 改用 return@withLock(局部返回),并用 (amount, type) 二元组作 key
+        // 原代码"return"在 withLock { } 中是 non-local return(Mutex.withLock 是 inline),
+        //      会直接从 recordTransaction 退出,导致"弹了通知但没写库"——但弹通知的代码在调用 recordTransaction 之后
+        //      还是会执行,造成"通知弹了但数据库没记录"的诡异现象。
+        val key = DedupKey(parsed.amount, parsed.transactionType.name)
         val shouldRecord = dedupMutex.withLock {
-            val lastTime = recentRecordedAmounts[parsed.amount]
-            if (lastTime != null && now - lastTime < amountDedupWindowMs) return
+            val lastTime = recentRecordedAmounts[key]
+            if (lastTime != null && now - lastTime < amountDedupWindowMs) {
+                return@withLock false
+            }
             recentRecordedAmounts.entries.removeAll { now - it.value > 60_000 }
-            recentRecordedAmounts[parsed.amount] = now
+            recentRecordedAmounts[key] = now
             true
         }
+        if (!shouldRecord) return
 
         val db = com.financetracker.FinanceTrackerApp.instance.database
         // Match account by package name, fall back to parser's accountType

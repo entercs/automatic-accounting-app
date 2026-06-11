@@ -19,6 +19,8 @@ class ScreenContentParser {
     private val paySuccessKeywords = listOf(
         "支付成功", "付款成功", "交易成功",
         "扫码成功",
+        // 1.0.8 修复: 京东白条付款不弹系统通知,只能靠屏幕解析;同时兼容京东收银台/京东付款等文案
+        "京东白条付款", "白条付款", "京东付款", "京东收银台",
     )
 
     // 收款成功关键词（支持"你已收款""已收款""收款成功""到账"等微信/支付宝收款页文案）
@@ -56,12 +58,9 @@ class ScreenContentParser {
             return null
         }
 
-        // Payment result screens are simple; complex screens = non-payment pages
-        if (texts.size > 25) {
-            Log.d(TAG, "屏幕解析: 节点过多(${texts.size})，疑似非支付页 ($packageName)")
-            return null
-        }
-
+        // 1.0.8 修复: 取消"节点数 > 25 跳过"的硬限制。
+        // 原限制会导致京东支付成功页(底部有大量推荐广告)被误判为非支付页,京东白条 ¥25.75 识别不到。
+        // 改为依赖 hasPayKeywords 关键词 + 后续金额验证,更准。
         // STRICT: must contain payment SUCCESS keywords (not just "支付")
         if (!hasPayKeywords(texts)) {
             Log.d(TAG, "屏幕解析: 未找到支付关键词 ($packageName), 文本=${texts.take(8)}")
