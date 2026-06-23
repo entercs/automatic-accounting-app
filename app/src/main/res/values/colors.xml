@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="primary">#4CAF50</color>
-    <color name="expense">#F44336</color>
-    <color name="income">#4CAF50</color>
+    <!-- 1.0.9 UI 规范: 莫兰迪色系 -->
+    <color name="primary">#73C991</color>
+    <color name="expense">#E75C5C</color>
+    <color name="income">#73C991</color>
 </resources>

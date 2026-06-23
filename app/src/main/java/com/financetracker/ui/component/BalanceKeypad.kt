@@ -2,23 +2,23 @@ package com.financetracker.ui.component
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.financetracker.ui.theme.Green500
+import com.financetracker.ui.theme.CardSmall
 
+// 1.0.9 UI 规范: 数字键盘 - 按键 CardSmall(12dp), 完成按钮 CardSmall+主色填充+白字
 @Composable
 fun BalanceKeypad(
     onKey: (String) -> Unit,
@@ -67,12 +67,12 @@ fun BalanceKeypad(
             OutlinedButton(
                 onClick = onBackspace,
                 modifier = Modifier.weight(1f).height(48.dp),
-                shape = RoundedCornerShape(8.dp),
+                shape = CardSmall,
             ) {
                 Text("⌫", fontSize = 18.sp)
             }
         }
-        // Row 5: -/+ toggle
+        // Row 5: - toggle + 完成主按钮
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -80,17 +80,21 @@ fun BalanceKeypad(
             OutlinedButton(
                 onClick = { onKey("-") },
                 modifier = Modifier.weight(1f).height(48.dp),
-                shape = RoundedCornerShape(8.dp),
+                shape = CardSmall,
             ) {
                 Text("−", fontSize = 20.sp)
             }
             Button(
                 onClick = onDone,
                 modifier = Modifier.weight(2f).height(48.dp),
-                shape = RoundedCornerShape(8.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Green500),
+                shape = CardSmall,
+                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                ),
             ) {
-                Text("完成", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Text("完成", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
             }
         }
     }
@@ -105,7 +109,7 @@ private fun NumericKeyButton(
     OutlinedButton(
         onClick = onClick,
         modifier = modifier.height(48.dp),
-        shape = RoundedCornerShape(8.dp),
+        shape = CardSmall,
     ) {
         Text(
             text = key,

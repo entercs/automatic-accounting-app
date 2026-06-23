@@ -58,9 +58,10 @@ import com.financetracker.domain.model.Category
 import com.financetracker.domain.model.PaymentAccount
 import com.financetracker.domain.model.TransactionType
 import com.financetracker.ui.component.CalculatorKeypad
+import com.financetracker.ui.component.SegmentedTab
 import com.financetracker.ui.component.VoiceInputButton
-import com.financetracker.ui.theme.Green500
-import com.financetracker.ui.theme.Red500
+import com.financetracker.ui.theme.CardLarge
+import com.financetracker.ui.theme.softCardShadow
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -166,42 +167,32 @@ fun AddTransactionScreen(editTransactionId: Long? = null, refundTransactionId: L
                     }
                 }
 
-                // Type toggle
+                // 1.0.9 UI 规范: 类型切换 Tab - 用 SegmentedTab 替代卡片色块(禁止色块高亮)
                 item {
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        listOf(TransactionType.EXPENSE to "支出", TransactionType.INCOME to "收入", TransactionType.TRANSFER to "转账").forEach { (type, label) ->
-                            val isSelected = selectedType == type
-                            val typeColor = when (type) { TransactionType.EXPENSE -> Red500; TransactionType.INCOME -> Green500; else -> Color(0xFF757575) }
-                            val bgColor = if (isSelected) typeColor else Color.Transparent
-                            val textColor = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface
-
-                            Card(
-                                modifier = Modifier.weight(1f).clickable { viewModel.setType(type) },
-                                colors = CardDefaults.cardColors(containerColor = bgColor),
-                                border = if (!isSelected) BorderStroke(1.dp, MaterialTheme.colorScheme.outline) else null,
-                            ) {
-                                Text(
-                                    text = label,
-                                    modifier = Modifier.padding(12.dp).fillMaxWidth(),
-                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                    color = textColor,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                )
-                            }
-                        }
-                    }
+                    SegmentedTab(
+                        options = listOf(
+                            "支出" to TransactionType.EXPENSE,
+                            "收入" to TransactionType.INCOME,
+                            "转账" to TransactionType.TRANSFER,
+                        ),
+                        selected = selectedType,
+                        onSelect = { viewModel.setType(it) },
+                    )
                 }
 
                 // Reimbursable toggle (right after type, only for expense)
                 if (selectedType == TransactionType.EXPENSE) {
                     item {
                         Card(
-                            modifier = Modifier.fillMaxWidth().clickable { viewModel.setReimbursable(!reimbursable) },
-                            colors = CardDefaults.cardColors(containerColor = if (reimbursable) Green500.copy(alpha = 0.1f) else MaterialTheme.colorScheme.surfaceVariant),
-                            border = if (reimbursable) BorderStroke(1.dp, Green500) else null,
+                            modifier = Modifier.fillMaxWidth().clickable { viewModel.setReimbursable(!reimbursable) }.softCardShadow(),
+                            shape = CardLarge,
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (reimbursable) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+                            ),
+                            border = if (reimbursable) BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else null,
                         ) {
                             Row(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Text("可报销", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
@@ -214,7 +205,7 @@ fun AddTransactionScreen(editTransactionId: Long? = null, refundTransactionId: L
                 // Transfer account selectors (only for transfer)
                 if (selectedType == TransactionType.TRANSFER) {
                     item {
-                        Text("转出账户", style = MaterialTheme.typography.titleMedium)
+                        Text("转出账户", style = MaterialTheme.typography.titleLarge)
                         Spacer(modifier = Modifier.height(8.dp))
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             accounts.forEach { account ->
@@ -225,7 +216,7 @@ fun AddTransactionScreen(editTransactionId: Long? = null, refundTransactionId: L
                         }
                     }
                     item {
-                        Text("转入账户", style = MaterialTheme.typography.titleMedium)
+                        Text("转入账户", style = MaterialTheme.typography.titleLarge)
                         Spacer(modifier = Modifier.height(8.dp))
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             accounts.filter { it.id != selectedAccountId }.forEach { account ->
@@ -240,7 +231,7 @@ fun AddTransactionScreen(editTransactionId: Long? = null, refundTransactionId: L
                 // Category selector (for non-transfer)
                 if (selectedType != TransactionType.TRANSFER) {
                     item {
-                        Text("选择分类", style = MaterialTheme.typography.titleMedium)
+                        Text("选择分类", style = MaterialTheme.typography.titleLarge)
                         Spacer(modifier = Modifier.height(8.dp))
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             categories.forEach { cat ->
@@ -254,15 +245,16 @@ fun AddTransactionScreen(editTransactionId: Long? = null, refundTransactionId: L
 
                 // Date
                 item {
-                    Text("交易时间", style = MaterialTheme.typography.titleMedium)
+                    Text("交易时间", style = MaterialTheme.typography.titleLarge)
                     Spacer(modifier = Modifier.height(8.dp))
                     Card(
-                        modifier = Modifier.fillMaxWidth().clickable { showDatePicker = true },
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                        modifier = Modifier.fillMaxWidth().clickable { showDatePicker = true }.softCardShadow(),
+                        shape = CardLarge,
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                     ) {
                         Text(
                             text = dateFormat.format(Date(date)),
-                            modifier = Modifier.padding(12.dp),
+                            modifier = Modifier.padding(16.dp),
                             style = MaterialTheme.typography.bodyLarge,
                         )
                     }
@@ -296,7 +288,7 @@ fun AddTransactionScreen(editTransactionId: Long? = null, refundTransactionId: L
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         templates.forEach { tpl ->
                             TextButton(onClick = { viewModel.setNote(tpl) }, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)) {
-                                Text(tpl, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(tpl, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     }
@@ -335,12 +327,13 @@ fun AddTransactionScreen(editTransactionId: Long? = null, refundTransactionId: L
 
 @Composable
 private fun CategoryChip(category: Category, isSelected: Boolean, onClick: () -> Unit) {
-    val bgColor = if (isSelected) Green500.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant
+    val primary = MaterialTheme.colorScheme.primary
+    val bgColor = if (isSelected) primary.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant
     Card(
         modifier = Modifier.clickable(onClick = onClick),
         colors = CardDefaults.cardColors(containerColor = bgColor),
-        border = if (isSelected) BorderStroke(1.5.dp, Green500) else null,
-        shape = RoundedCornerShape(20.dp),
+        border = if (isSelected) BorderStroke(1.5.dp, primary) else null,
+        shape = RoundedCornerShape(12.dp),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
@@ -355,8 +348,8 @@ private fun CategoryChip(category: Category, isSelected: Boolean, onClick: () ->
             Text(
                 category.name,
                 style = MaterialTheme.typography.bodyMedium,
-                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                color = if (isSelected) Green500 else MaterialTheme.colorScheme.onSurface,
+                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                color = if (isSelected) primary else MaterialTheme.colorScheme.onSurface,
             )
         }
     }
@@ -364,14 +357,14 @@ private fun CategoryChip(category: Category, isSelected: Boolean, onClick: () ->
 
 @Composable
 private fun AccountChip(account: PaymentAccount, isSelected: Boolean, onClick: () -> Unit) {
-    val accColor = try { Color(android.graphics.Color.parseColor(account.color)) } catch (_: Exception) { Green500 }
-    val bgColor = if (isSelected) accColor.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant
+    val accColor = try { Color(android.graphics.Color.parseColor(account.color)) } catch (_: Exception) { MaterialTheme.colorScheme.primary }
+    val bgColor = if (isSelected) accColor.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant
     val borderColor = if (isSelected) accColor else null
     Card(
         modifier = Modifier.clickable(onClick = onClick),
         colors = CardDefaults.cardColors(containerColor = bgColor),
         border = borderColor?.let { BorderStroke(1.5.dp, it) },
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(12.dp),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
@@ -382,7 +375,7 @@ private fun AccountChip(account: PaymentAccount, isSelected: Boolean, onClick: (
             Text(
                 account.name,
                 style = MaterialTheme.typography.bodyMedium,
-                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
                 color = if (isSelected) accColor else MaterialTheme.colorScheme.onSurface,
             )
         }

@@ -75,10 +75,10 @@ import com.financetracker.di.AppModule
 import com.financetracker.ui.component.DateHeader
 import com.financetracker.ui.component.TransactionItem
 import com.financetracker.ui.component.groupTransactionsByDay
-import com.financetracker.ui.theme.Green500
-import com.financetracker.ui.theme.Red500
 import com.financetracker.ui.theme.AccountIconDisplay
+import com.financetracker.ui.theme.CardSmall
 import com.financetracker.ui.theme.accountColor
+import com.financetracker.ui.theme.softCardShadow
 import java.util.Calendar
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -168,10 +168,12 @@ fun HomeScreen(
 
     Scaffold(
         floatingActionButton = {
+            // 1.0.9 UI 规范: FAB 圆角 12dp(CardSmall), 主色填充, 白图标
             FloatingActionButton(
                 onClick = onNavigateToAdd,
-                containerColor = Green500,
-                contentColor = Color.White,
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                shape = com.financetracker.ui.theme.CardSmall,
             ) {
                 Icon(imageVector = Icons.Filled.Add, contentDescription = "记账")
             }
@@ -204,7 +206,7 @@ fun HomeScreen(
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
             LazyColumn(
                 state = listState,
-                modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+                modifier = Modifier.fillMaxSize().padding(horizontal = com.financetracker.ui.theme.PageHorizontalPadding),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 // Search bar — initially scrolled off-screen above, pull down to reveal
@@ -212,45 +214,52 @@ fun HomeScreen(
                     OutlinedTextField(
                         value = searchQuery,
                         onValueChange = { searchQuery = it },
-                        placeholder = { Text("搜索…", fontSize = 14.sp) },
+                        placeholder = { Text("搜索…", style = MaterialTheme.typography.bodyMedium) },
                         modifier = Modifier.fillMaxWidth().height(48.dp),
-                        shape = RoundedCornerShape(24.dp),
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
                         singleLine = true,
                         textStyle = MaterialTheme.typography.bodyMedium,
                     )
                 }
 
-            // Summary card
+            // 1.0.9 UI 规范: 月度结余卡片 - 渐变头 + CardLarge(16dp) + softCardShadow
             item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .softCardShadow()
+                        .clip(com.financetracker.ui.theme.CardLarge)
+                        .background(com.financetracker.ui.theme.HeaderGradient),
                 ) {
-                    Column(modifier = Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Column(
+                        modifier = Modifier.padding(com.financetracker.ui.theme.CardInnerPadding),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
                         Text(monthLabel(), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(modifier = Modifier.height(4.dp))
                         val balance = totalIncome - totalExpense
-                        val balanceColor = if (balance >= 0) Green500 else Red500
-                        Text("结余", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        val balanceColor = if (balance >= 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                        Text("结余", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text(
                             "${String.format("%.2f", balance)}",
-                            fontSize = 28.sp,
-                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.displayLarge,
                             color = balanceColor,
                         )
                         Spacer(modifier = Modifier.height(6.dp))
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                            SummaryItem("支出", totalExpense, Red500)
-                            SummaryItem("收入", totalIncome, Green500)
+                            SummaryItem("支出", totalExpense, MaterialTheme.colorScheme.error)
+                            SummaryItem("收入", totalIncome, MaterialTheme.colorScheme.primary)
                         }
                     }
                 }
             }
 
             item {
-                Text("最近交易", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
+                Text(
+                    "最近交易",
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
+                )
             }
 
             if (displayedTransactions.isEmpty()) {
@@ -258,6 +267,7 @@ fun HomeScreen(
                     Box(modifier = Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) {
                         Text(
                             if (isLoadingMore) "加载中…" else "还没有交易记录\n点击右下角按钮开始记账",
+                            style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
@@ -313,7 +323,7 @@ fun HomeScreen(
                         modifier = Modifier.fillMaxWidth().padding(16.dp),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Text("加载中…", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
+                        Text("加载中…", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                     }
                 }
             } else if (!hasMore && pagedTransactions.isNotEmpty()) {
@@ -322,7 +332,7 @@ fun HomeScreen(
                         modifier = Modifier.fillMaxWidth().padding(16.dp),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Text("— 已加载全部 ${pagedTransactions.size} 条 —", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                        Text("— 已加载全部 ${pagedTransactions.size} 条 —", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }
@@ -331,15 +341,15 @@ fun HomeScreen(
     }
 }
 
+// 1.0.9 UI 规范: SummaryItem - 标签 bodySmall 辅助文字, 金额 bodyLarge 主/支出色
 @Composable
 private fun SummaryItem(label: String, amount: Double, color: Color) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(text = label, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = "${String.format("%.2f", amount)}",
-            fontSize = 18.sp,
-            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.bodyLarge,
             color = color,
         )
     }
@@ -372,17 +382,22 @@ private fun SwipeRevealItem(
         modifier = Modifier
             .fillMaxWidth()
             .height(IntrinsicSize.Min)
-            .clip(RoundedCornerShape(12.dp)),
+            .clip(CardSmall),
     ) {
-        // Red delete background — full height, on the RIGHT
+        // 1.0.9 UI 规范: 删除背景用主题 error 色(砖红)
         Box(
             modifier = Modifier
                 .matchParentSize()
-                .background(Red500),
+                .background(MaterialTheme.colorScheme.error),
             contentAlignment = Alignment.CenterEnd,
         ) {
             IconButton(onClick = { onDelete(); onHide() }) {
-                Icon(Icons.Filled.Delete, contentDescription = "删除", tint = Color.White, modifier = Modifier.size(28.dp))
+                Icon(
+                    Icons.Filled.Delete,
+                    contentDescription = "删除",
+                    tint = MaterialTheme.colorScheme.onError,
+                    modifier = Modifier.size(28.dp),
+                )
             }
         }
 

@@ -3,11 +3,13 @@ package com.financetracker.ui.screen.settings
 import android.content.Intent
 import android.provider.Settings
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -47,6 +49,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -64,8 +67,9 @@ import com.financetracker.notification.AccessibilityStateHolder
 import com.financetracker.ui.component.AccountLogo
 import com.financetracker.ui.component.BalanceKeypad
 import com.financetracker.ui.theme.AccountIconDisplay
-import com.financetracker.ui.theme.Green500
-import com.financetracker.ui.theme.Red500
+import com.financetracker.ui.theme.CardLarge
+import com.financetracker.ui.theme.HeaderGradient
+import com.financetracker.ui.theme.softCardShadow
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -113,22 +117,25 @@ fun SettingsScreen() {
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp),
         ) {
-            // ── Total assets (top) ──
+            // 1.0.9 UI 规范: 净资产卡片 - 渐变头 + CardLarge(16dp) + softCardShadow
             item {
                 val totalAssets = accounts.sumOf { it.balance }
-                val assetsColor = if (totalAssets >= 0) Green500 else Red500
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                val assetsColor = if (totalAssets >= 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .softCardShadow()
+                        .clip(CardLarge)
+                        .background(HeaderGradient),
                 ) {
-                    Column(modifier = Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("净资产", fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Column(
+                        modifier = Modifier.padding(20.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Text("净资产", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text(
-                            "${String.format("%.2f", totalAssets)}",
-                            fontSize = 28.sp,
-                            fontWeight = FontWeight.Bold,
+                            String.format("%.2f", totalAssets),
+                            style = MaterialTheme.typography.displayLarge,
                             color = assetsColor,
                         )
                     }
@@ -138,8 +145,11 @@ fun SettingsScreen() {
 
             // ── Account settings ──
             item {
-                Text("账户设置", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 8.dp))
-                Card(modifier = Modifier.fillMaxWidth()) {
+                Text("账户设置", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(bottom = 8.dp))
+                Card(
+                    modifier = Modifier.fillMaxWidth().softCardShadow(),
+                    shape = CardLarge,
+                ) {
                     Column {
                         accounts.forEachIndexed { i, acc ->
                             val balColor = try {
@@ -157,16 +167,16 @@ fun SettingsScreen() {
                                         editText = String.format("%.2f", acc.balance)
                                         showDialog = true
                                     }
-                                    .padding(start = 12.dp, end = 4.dp, top = 12.dp, bottom = 12.dp),
+                                    .padding(start = 16.dp, end = 4.dp, top = 12.dp, bottom = 12.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 AccountIconDisplay(type = acc.type, accountName = acc.name, size = 28.dp)
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(acc.name, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
                                 Text(
-                                    "${String.format("%.2f", acc.balance)}",
-                                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold),
-                                    color = if (acc.balance >= 0) Green500 else Red500,
+                                    String.format("%.2f", acc.balance),
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = if (acc.balance >= 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
                                 )
                             }
 
@@ -180,7 +190,7 @@ fun SettingsScreen() {
                                             viewModel.deleteAccount(acc)
                                             showDeleteConfirm = false
                                         }) {
-                                            Text("删除", color = Red500)
+                                            Text("删除", color = MaterialTheme.colorScheme.error)
                                         }
                                     },
                                     dismissButton = {
@@ -200,7 +210,7 @@ fun SettingsScreen() {
                                                 showDialog = false
                                                 showDeleteConfirm = true
                                             }) {
-                                                Text("删除账户", color = Red500)
+                                                Text("删除账户", color = MaterialTheme.colorScheme.error)
                                             }
                                         }
                                     },
@@ -217,8 +227,7 @@ fun SettingsScreen() {
                                                 ) {
                                                     Text(
                                                         tempBalance.ifEmpty { "0" },
-                                                        fontSize = 32.sp,
-                                                        fontWeight = FontWeight.Bold,
+                                                        style = MaterialTheme.typography.displayLarge,
                                                     )
                                                 }
                                             }
@@ -310,7 +319,7 @@ fun SettingsScreen() {
                                                     createName = if (t == "bank") "" else l
                                                     createColor = if (t == "wechat") "#07C160" else if (t == "alipay") "#1677FF" else if (t == "jd") "#E3312C" else "#F5A623"
                                                 }) {
-                                                    Text(l, color = if (sel) Green500 else MaterialTheme.colorScheme.onSurface, fontWeight = if (sel) FontWeight.Bold else FontWeight.Normal)
+                                                    Text(l, color = if (sel) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface, fontWeight = if (sel) FontWeight.SemiBold else FontWeight.Normal)
                                                 }
                                             }
                                         }
@@ -358,8 +367,7 @@ fun SettingsScreen() {
                                             ) {
                                                 Text(
                                                     tempBalance.ifEmpty { "0" },
-                                                    fontSize = 28.sp,
-                                                    fontWeight = FontWeight.Bold,
+                                                    style = MaterialTheme.typography.displayLarge,
                                                 )
                                             }
                                         }
@@ -406,7 +414,7 @@ fun SettingsScreen() {
                     }
                     is SettingsViewModel.ExportState.Success -> {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("导出成功", color = Green500, fontSize = 12.sp)
+                            Text("导出成功", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
                             Spacer(modifier = Modifier.width(8.dp))
                             TextButton(onClick = { viewModel.clearExportState() }) { Text("关闭", fontSize = 12.sp) }
                             TextButton(onClick = {
@@ -428,8 +436,11 @@ fun SettingsScreen() {
 
             // ── Notification monitoring (bottom) ──
             item {
-                Text("通知监听", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 8.dp))
-                Card(modifier = Modifier.fillMaxWidth()) {
+                Text("通知监听", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(bottom = 8.dp))
+                Card(
+                    modifier = Modifier.fillMaxWidth().softCardShadow(),
+                    shape = CardLarge,
+                ) {
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(16.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -440,7 +451,7 @@ fun SettingsScreen() {
                                 if (isAccessibilityEnabled) "无障碍已开启，正在监听通知和屏幕"
                                    else "无障碍未开启，无法自动记账",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = if (isAccessibilityEnabled) Green500 else MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = if (isAccessibilityEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                         // Switch 反映真实无障碍状态，点击跳系统设置

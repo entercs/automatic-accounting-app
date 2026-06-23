@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import com.financetracker.ui.component.SegmentedTab
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,9 +32,11 @@ import com.financetracker.domain.model.TransactionType
 import com.financetracker.ui.component.CategoryLogo
 import com.financetracker.ui.component.PieChart
 import com.financetracker.ui.component.PieSlice
-import com.financetracker.ui.theme.Green500
+import com.financetracker.ui.theme.Amber500
+import com.financetracker.ui.theme.CardLarge
+import com.financetracker.ui.theme.CardInnerPadding
 import com.financetracker.ui.theme.PieChartColors
-import com.financetracker.ui.theme.Red500
+import com.financetracker.ui.theme.softCardShadow
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -71,6 +74,12 @@ fun StatisticsScreen() {
     val isRefreshing by viewModel.isRefreshing.collectAsState()
 
     Scaffold { padding ->
+        // 1.0.9 UI 规范: 把 selType/typeColor 提到 Scaffold content lambda(Composable context),
+        //  否则在 LazyColumn item 外直接读 MaterialTheme.colorScheme 会编译失败
+        val selType = selectedType
+        val typeColor = if (selType == TransactionType.EXPENSE) MaterialTheme.colorScheme.error
+            else if (selType == TransactionType.INCOME) MaterialTheme.colorScheme.primary
+            else MaterialTheme.colorScheme.error
         PullToRefreshBox(
             isRefreshing = isRefreshing,
             onRefresh = { viewModel.refresh() },
@@ -80,20 +89,19 @@ fun StatisticsScreen() {
             modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            // Period selector
+            // 1.0.9 UI 规范: 周/月/年 Tab - 用 SegmentedTab 替代 FilterChip(禁止色块高亮)
             item {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    listOf(StatPeriod.WEEK to "周", StatPeriod.MONTH to "月", StatPeriod.YEAR to "年", StatPeriod.CUSTOM to "自定义").forEach { (p, label) ->
-                        FilterChip(
-                            selected = period == p,
-                            onClick = { viewModel.setPeriod(p) },
-                            label = { Text(label, fontSize = 12.sp) },
-                        )
-                    }
-                }
+                SegmentedTab(
+                    options = listOf(
+                        "周" to StatPeriod.WEEK,
+                        "月" to StatPeriod.MONTH,
+                        "年" to StatPeriod.YEAR,
+                        "自定义" to StatPeriod.CUSTOM,
+                    ),
+                    selected = period,
+                    onSelect = { viewModel.setPeriod(it) },
+                    modifier = Modifier.padding(top = 8.dp),
+                )
             }
 
             // Date navigation
@@ -120,92 +128,89 @@ fun StatisticsScreen() {
                 }
             }
 
-            // Summary cards — clickable to toggle detail view
+            // 1.0.9 UI 规范: 收支概览卡片 - 白色背景 CardLarge,只文字用主/支出色,不用色块填充
             item {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
                     val expenseSelected = selectedType == TransactionType.EXPENSE
                     Card(
-                        modifier = Modifier.weight(1f).clickable { viewModel.toggleType(TransactionType.EXPENSE) },
-                        colors = CardDefaults.cardColors(containerColor = if (expenseSelected) Red500.copy(alpha = 0.25f) else Red500.copy(alpha = 0.1f)),
+                        modifier = Modifier.weight(1f).clickable { viewModel.toggleType(TransactionType.EXPENSE) }.softCardShadow(),
+                        shape = CardLarge,
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                     ) {
-                        Column(modifier = Modifier.padding(12.dp)) {
-                            Text("支出 ▼", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Column(modifier = Modifier.padding(CardInnerPadding)) {
+                            Text(
+                                "支出 ▼",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                             Spacer(modifier = Modifier.height(4.dp))
-                            Text("${String.format("%.2f", expenseTotal)}", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Red500)
+                            Text(
+                                String.format("%.2f", expenseTotal),
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.error,
+                                fontWeight = if (expenseSelected) FontWeight.SemiBold else FontWeight.Normal,
+                            )
                         }
                     }
                     val incomeSelected = selectedType == TransactionType.INCOME
                     Card(
-                        modifier = Modifier.weight(1f).clickable { viewModel.toggleType(TransactionType.INCOME) },
-                        colors = CardDefaults.cardColors(containerColor = if (incomeSelected) Green500.copy(alpha = 0.25f) else Green500.copy(alpha = 0.1f)),
+                        modifier = Modifier.weight(1f).clickable { viewModel.toggleType(TransactionType.INCOME) }.softCardShadow(),
+                        shape = CardLarge,
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                     ) {
-                        Column(modifier = Modifier.padding(12.dp)) {
-                            Text("收入 ▼", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Column(modifier = Modifier.padding(CardInnerPadding)) {
+                            Text(
+                                "收入 ▼",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                             Spacer(modifier = Modifier.height(4.dp))
-                            Text("${String.format("%.2f", incomeTotal)}", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Green500)
+                            Text(
+                                String.format("%.2f", incomeTotal),
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = if (incomeSelected) FontWeight.SemiBold else FontWeight.Normal,
+                            )
                         }
                     }
                 }
             }
 
             // When a type is selected, show pie chart + trend chart for that type
-            val selType = selectedType
             if (selType != null) {
                 val summaries = if (selType == TransactionType.EXPENSE) expenseCategories else incomeCategories
                 val dailyTotals = if (selType == TransactionType.EXPENSE) expenseDailyTotals else incomeDailyTotals
                 val typeLabel = if (selType == TransactionType.EXPENSE) "支出" else "收入"
-                val typeColor = if (selType == TransactionType.EXPENSE) Red500 else Green500
 
-                // Pie chart — with corner protrusion connecting to summary card above
+                // Pie chart — 规范要求 CardLarge(16dp) + softCardShadow,取消 protrusion
                 item {
-                    val isExpense = selType == TransactionType.EXPENSE
-                    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-                        // Width matching summary card: (total - 12dp spacing) / 2
-                        val tabWidth = (maxWidth - 12.dp) * 0.5f
-                        Column {
-                            // Protrusion row — sits above card, below summary card
-                            Row(modifier = Modifier.fillMaxWidth()) {
-                                if (isExpense) {
-                                    Card(
-                                        modifier = Modifier.width(tabWidth).height(14.dp),
-                                        shape = RoundedCornerShape(topStart = 10.dp, topEnd = 10.dp),
-                                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                                    ) {}
+                    Card(
+                        modifier = Modifier.fillMaxWidth().softCardShadow(),
+                        shape = CardLarge,
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(CardInnerPadding),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            Text("${typeLabel}分类", style = MaterialTheme.typography.titleLarge)
+                            Spacer(modifier = Modifier.height(12.dp))
+                            if (summaries.isNotEmpty()) {
+                                val slices = summaries.mapIndexed { i, s ->
+                                    PieSlice(
+                                        label = "${s.category.name}",
+                                        value = s.amount.toFloat(),
+                                        color = PieChartColors[i % PieChartColors.size],
+                                    )
                                 }
-                                Spacer(modifier = Modifier.weight(1f))
-                                if (!isExpense) {
-                                    Card(
-                                        modifier = Modifier.width(tabWidth).height(14.dp),
-                                        shape = RoundedCornerShape(topStart = 10.dp, topEnd = 10.dp),
-                                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                                    ) {}
+                                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                                    PieChart(slices = slices)
                                 }
-                            }
-                            // Main Card — flat top where protrusion connects
-                            Card(
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(topStart = 0.dp, topEnd = 0.dp, bottomStart = 16.dp, bottomEnd = 16.dp),
-                                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                            ) {
-                                Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text("${typeLabel}分类", style = MaterialTheme.typography.titleMedium)
-                                    Spacer(modifier = Modifier.height(12.dp))
-                                    if (summaries.isNotEmpty()) {
-                                        val slices = summaries.mapIndexed { i, s ->
-                                            PieSlice(
-                                                label = "${s.category.name}",
-                                                value = s.amount.toFloat(),
-                                                color = PieChartColors[i % PieChartColors.size],
-                                            )
-                                        }
-                                        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                                            PieChart(slices = slices)
-                                        }
-                                    } else {
-                                        Box(modifier = Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) {
-                                            Text("暂无${typeLabel}数据", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                        }
-                                    }
+                            } else {
+                                Box(modifier = Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) {
+                                    Text("暂无${typeLabel}数据", color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
                         }
@@ -214,16 +219,20 @@ fun StatisticsScreen() {
 
                 // Trend chart
                 item {
-                    Card(modifier = Modifier.fillMaxWidth()) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Text("${typeLabel}趋势", style = MaterialTheme.typography.titleMedium)
+                    Card(
+                        modifier = Modifier.fillMaxWidth().softCardShadow(),
+                        shape = CardLarge,
+                    ) {
+                        Column(modifier = Modifier.padding(CardInnerPadding)) {
+                            Text("${typeLabel}趋势", style = MaterialTheme.typography.titleLarge)
                             Spacer(modifier = Modifier.height(12.dp))
                             if (dailyTotals.isNotEmpty()) {
+                                // 1.0.9 UI 规范: 趋势线用暖橙 Amber500
                                 TrendChart(
                                     dailyTotals = dailyTotals,
                                     startDate = startDate,
                                     endDate = endDate,
-                                    lineColor = Color(0xFFFFA000),
+                                    lineColor = Amber500,
                                     modifier = Modifier.fillMaxWidth().height(200.dp),
                                 )
                             } else {
@@ -238,9 +247,12 @@ fun StatisticsScreen() {
                 // Category list
                 if (summaries.isNotEmpty()) {
                     item {
-                        Card(modifier = Modifier.fillMaxWidth()) {
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                Text("分类明细", style = MaterialTheme.typography.titleMedium)
+                        Card(
+                            modifier = Modifier.fillMaxWidth().softCardShadow(),
+                            shape = CardLarge,
+                        ) {
+                            Column(modifier = Modifier.padding(CardInnerPadding)) {
+                                Text("分类明细", style = MaterialTheme.typography.titleLarge)
                                 Spacer(modifier = Modifier.height(8.dp))
                                 summaries.forEach { cs ->
                                     Row(
@@ -249,10 +261,10 @@ fun StatisticsScreen() {
                                     ) {
                                         CategoryLogo(categoryName = cs.category.name, categoryIcon = cs.category.icon, size = 24.dp)
                                         Spacer(modifier = Modifier.width(8.dp))
-                                        Text(cs.category.name, modifier = Modifier.weight(1f))
-                                        Text("${String.format("%.2f", cs.amount)}", fontWeight = FontWeight.Medium)
+                                        Text(cs.category.name, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                                        Text(String.format("%.2f", cs.amount), style = MaterialTheme.typography.bodyLarge, color = typeColor)
                                         Spacer(modifier = Modifier.width(8.dp))
-                                        Text("${String.format("%.1f", cs.percentage * 100)}%", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Text(String.format("%.1f", cs.percentage * 100) + "%", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     }
                                 }
                             }
@@ -266,13 +278,17 @@ fun StatisticsScreen() {
                         val diff = expenseTotal - prevExpenseTotal
                         val pct = if (prevExpenseTotal > 0) (diff / prevExpenseTotal * 100) else 0.0
                         val isUp = diff > 0
-                        Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = (if (isUp) Red500 else Green500).copy(alpha = 0.08f))) {
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                Text("环比对比", style = MaterialTheme.typography.titleMedium)
+                        val compColor = if (isUp) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                        Card(
+                            modifier = Modifier.fillMaxWidth().softCardShadow(),
+                            shape = CardLarge,
+                        ) {
+                            Column(modifier = Modifier.padding(CardInnerPadding)) {
+                                Text("环比对比", style = MaterialTheme.typography.titleLarge)
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                    Text("上期支出 ${String.format("%.2f", prevExpenseTotal)}", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    Text("本期支出 ${String.format("%.2f", expenseTotal)}", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                    Text("上期支出 ${String.format("%.2f", prevExpenseTotal)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text("本期支出 ${String.format("%.2f", expenseTotal)}", style = MaterialTheme.typography.bodyMedium)
                                 }
                                 Spacer(modifier = Modifier.height(4.dp))
                                 val maxVal = maxOf(expenseTotal, prevExpenseTotal).toFloat().coerceAtLeast(1f)
@@ -286,14 +302,15 @@ fun StatisticsScreen() {
                                     }
                                     Box(modifier = Modifier.weight(currW).fillMaxHeight().padding(start = 2.dp)) {
                                         Canvas(modifier = Modifier.fillMaxSize()) {
-                                            drawRoundRect(if (isUp) Red500 else Green500, cornerRadius = androidx.compose.ui.geometry.CornerRadius(10f, 10f))
+                                            drawRoundRect(compColor, cornerRadius = androidx.compose.ui.geometry.CornerRadius(10f, 10f))
                                         }
                                     }
                                 }
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
                                     if (isUp) "比上期多花 ${String.format("%.1f", pct)}%" else "比上期少花 ${String.format("%.1f", kotlin.math.abs(pct))}%",
-                                    fontSize = 12.sp, color = if (isUp) Red500 else Green500, fontWeight = FontWeight.Medium,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = compColor,
                                 )
                             }
                         }
@@ -303,26 +320,31 @@ fun StatisticsScreen() {
                 // Yearly report (monthly bars)
                 if (period == StatPeriod.YEAR) {
                     item {
-                        Card(modifier = Modifier.fillMaxWidth()) {
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                Text("月度趋势", style = MaterialTheme.typography.titleMedium)
+                        Card(
+                            modifier = Modifier.fillMaxWidth().softCardShadow(),
+                            shape = CardLarge,
+                        ) {
+                            Column(modifier = Modifier.padding(CardInnerPadding)) {
+                                Text("月度趋势", style = MaterialTheme.typography.titleLarge)
                                 Spacer(modifier = Modifier.height(4.dp))
-                                Text("年度总支出 ${String.format("%.2f", yearlyTotalExpense)}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("年度总支出 ${String.format("%.2f", yearlyTotalExpense)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 Spacer(modifier = Modifier.height(12.dp))
                                 if (monthlyExpenses.isNotEmpty()) {
                                     val maxM = monthlyExpenses.max().toFloat().coerceAtLeast(1f)
                                     val months = listOf("1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月")
                                     Row(modifier = Modifier.fillMaxWidth().height(100.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                                         monthlyExpenses.forEachIndexed { i, v ->
+                                            // 在 Composable context 里取颜色,避免 Canvas DrawScope 里调 MaterialTheme
+                                            val barColor = if (v > 0) MaterialTheme.colorScheme.error else androidx.compose.ui.graphics.Color.LightGray
                                             Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                                                 Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.BottomCenter) {
                                                     val h = (v / maxM).toFloat().coerceAtLeast(0.03f)
                                                     Canvas(modifier = Modifier.fillMaxWidth().fillMaxHeight(h)) {
-                                                        drawRoundRect(if (v > 0) Red500 else Color.LightGray, cornerRadius = androidx.compose.ui.geometry.CornerRadius(4f, 4f))
+                                                        drawRoundRect(barColor, cornerRadius = androidx.compose.ui.geometry.CornerRadius(4f, 4f))
                                                     }
                                                 }
                                                 Spacer(modifier = Modifier.height(2.dp))
-                                                Text(months[i], fontSize = 8.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                Text(months[i], style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                             }
                                         }
                                     }

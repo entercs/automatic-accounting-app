@@ -56,8 +56,8 @@ import com.financetracker.di.AppModule
 import com.financetracker.domain.model.Category
 import com.financetracker.domain.model.PaymentAccount
 import com.financetracker.domain.model.TransactionType
-import com.financetracker.ui.theme.Green500
-import com.financetracker.ui.theme.Red500
+import com.financetracker.ui.theme.CardLarge
+import com.financetracker.ui.theme.softCardShadow
 import com.financetracker.ui.component.AccountLogo
 import com.financetracker.ui.component.CategoryLogo
 import kotlinx.coroutines.launch
@@ -115,7 +115,7 @@ fun TransactionDetailScreen(
                         Text("编辑")
                     }
                     TextButton(onClick = { showDeleteDialog = true }) {
-                        Text("删除", color = Red500)
+                        Text("删除", color = MaterialTheme.colorScheme.error)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White),
@@ -136,14 +136,17 @@ fun TransactionDetailScreen(
             // Amount
             item {
                 val isExpense = t.type == TransactionType.EXPENSE
-                val color = if (isExpense) Red500 else Green500
+                val color = if (isExpense) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
                 val prefix = if (isExpense) "-" else "+"
-                Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = color.copy(alpha = 0.1f))) {
+                Card(
+                    modifier = Modifier.fillMaxWidth().softCardShadow(),
+                    shape = CardLarge,
+                    colors = CardDefaults.cardColors(containerColor = color.copy(alpha = 0.1f)),
+                ) {
                     Column(modifier = Modifier.fillMaxWidth().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
                             "$prefix${String.format("%.2f", t.amount)}",
-                            fontSize = 32.sp,
-                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.displayLarge,
                             color = color,
                         )
                     }
@@ -156,7 +159,8 @@ fun TransactionDetailScreen(
                     Button(
                         onClick = { showRefundDialog = true },
                         modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = Green500),
+                        shape = CardLarge,
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                     ) {
                         Text("退款")
                     }
@@ -262,7 +266,7 @@ fun TransactionDetailScreen(
                         Text(cat.name, style = MaterialTheme.typography.bodyLarge)
                     }
                     if (cat.id == t.categoryId) {
-                        Icon(Icons.Default.Check, contentDescription = "选中", tint = Green500)
+                        Icon(Icons.Default.Check, contentDescription = "选中", tint = MaterialTheme.colorScheme.primary)
                     }
                 }
             }
@@ -295,7 +299,7 @@ fun TransactionDetailScreen(
                         Text(acc.name, style = MaterialTheme.typography.bodyLarge)
                     }
                     if (acc.id == t.accountId) {
-                        Icon(Icons.Default.Check, contentDescription = "选中", tint = Green500)
+                        Icon(Icons.Default.Check, contentDescription = "选中", tint = MaterialTheme.colorScheme.primary)
                     }
                 }
             }
@@ -309,7 +313,7 @@ fun TransactionDetailScreen(
             text = { Text("删除后将无法恢复，确定要删除这笔记录吗？") },
             confirmButton = {
                 TextButton(onClick = { viewModel.delete(); showDeleteDialog = false }) {
-                    Text("删除", color = Red500)
+                    Text("删除", color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
@@ -329,7 +333,7 @@ fun TransactionDetailScreen(
                     showRefundDialog = false
                     onRefund?.invoke()
                 }) {
-                    Text("确认退款", color = Green500)
+                    Text("确认退款", color = MaterialTheme.colorScheme.primary)
                 }
             },
             dismissButton = {

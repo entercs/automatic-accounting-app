@@ -14,13 +14,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.financetracker.domain.model.Category
-import com.financetracker.domain.model.PaymentAccount
 import com.financetracker.domain.model.Transaction
 import com.financetracker.domain.model.TransactionType
-import com.financetracker.ui.theme.Green500
-import com.financetracker.ui.theme.Red500
+import com.financetracker.ui.theme.Divider
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -62,22 +58,32 @@ fun groupTransactionsByDay(transactions: List<Transaction>): List<DailyGroup> {
     }.sortedByDescending { it.transactions.first().date }
 }
 
+// 1.0.9 UI 规范: 日汇总头部 — 日期 bodyMedium 二级文字, 收支汇总 bodySmall 主/支出色
 @Composable
 fun DateHeader(label: String, totalExpense: Double, totalIncome: Double) {
     Column(modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 4.dp)) {
-        Text(label, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
+        Text(label, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold))
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             if (totalExpense > 0) {
-                Text("支出 ${String.format("%.2f", totalExpense)}", fontSize = 12.sp, color = Red500)
+                Text(
+                    "支出 ${String.format("%.2f", totalExpense)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
             }
             if (totalIncome > 0) {
-                Text("收入 ${String.format("%.2f", totalIncome)}", fontSize = 12.sp, color = Green500)
+                Text(
+                    "收入 ${String.format("%.2f", totalIncome)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
             }
         }
         Spacer(modifier = Modifier.height(2.dp))
-        HorizontalDivider()
+        HorizontalDivider(color = Divider)
     }
 }
+

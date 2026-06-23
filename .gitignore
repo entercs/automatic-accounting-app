@@ -22,3 +22,5 @@ local.properties
 /scripts/
 # 1.0.8+ 调整: CHANGELOG.md 只本地维护,精确技术细节不入 git(用户视角说明在 apk/最新版本.md)
 /CHANGELOG.md
+# 1.0.9+ 调整: docs/ 设计规范等参考文档不入 git(本地维护)
+/docs/

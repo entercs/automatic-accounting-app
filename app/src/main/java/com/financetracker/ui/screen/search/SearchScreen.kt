@@ -29,7 +29,6 @@ import com.financetracker.di.AppModule
 import com.financetracker.ui.component.DateHeader
 import com.financetracker.ui.component.TransactionItem
 import com.financetracker.ui.component.groupTransactionsByDay
-import com.financetracker.ui.theme.Green500
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

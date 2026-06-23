@@ -73,6 +73,10 @@ fun VoiceInputButton(onResult: (VoiceParser.Result) -> Unit) {
         }
         launcher.launch(intent)
     }) {
-        Icon(Icons.Filled.Mic, contentDescription = "语音输入", tint = com.financetracker.ui.theme.Green500)
+        Icon(
+            Icons.Filled.Mic,
+            contentDescription = "语音输入",
+            tint = androidx.compose.material3.MaterialTheme.colorScheme.primary,
+        )
     }
 }
