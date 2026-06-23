@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.util.Calendar
@@ -84,53 +85,47 @@ class HomeViewModel(
     val accounts: StateFlow<List<PaymentAccount>> =
         accountRepo.getAll().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // ====== 分页加载：交易列表 ======
-    // 累计已加载的首页交易
-    private val _pagedTransactions = MutableStateFlow<List<Transaction>>(emptyList())
-    val pagedTransactions: StateFlow<List<Transaction>> = _pagedTransactions.asStateFlow()
+    // ====== 分页加载：交易列表 =====
+    // 1.0.9 修复: 改为观察 Room Flow + 客户端分页,无障碍服务后台写入新交易时,首页列表自动刷新
+    // 原来用 MutableStateFlow + loadFirstPage()/loadMore() 主动调用,后台插入记录后不会刷新
+    // (用户截图:产生记录后要切到别的页面再切回来才看到新记录)
+    private val _pagedSize = MutableStateFlow(PAGE_SIZE)
 
-    // 是否有更多
-    private val _hasMore = MutableStateFlow(true)
-    val hasMore: StateFlow<Boolean> = _hasMore.asStateFlow()
+    val pagedTransactions: StateFlow<List<Transaction>> = _pagedSize
+        .flatMapLatest { size ->
+            transactionRepo.getAllTransactions().map { all -> all.take(size) }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // 是否有更多(分页)
+    val hasMore: StateFlow<Boolean> = _pagedSize
+        .flatMapLatest { size ->
+            transactionRepo.getAllTransactions().map { all -> all.size > size }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     // 正在加载（防止重复触发）
     private val _isLoadingMore = MutableStateFlow(false)
     val isLoadingMore: StateFlow<Boolean> = _isLoadingMore.asStateFlow()
 
-    // 数据变化信号（删除/添加后递增,触发重置）
-    private val _dataVersion = MutableStateFlow(0)
-    val dataVersion: StateFlow<Int> = _dataVersion.asStateFlow()
-
     init {
-        // 首次加载第一页
-        loadFirstPage()
+        // 1.0.9 修复: 不再需要主动 loadFirstPage(),Flow 初始就订阅 Room
     }
 
-    /** 重置并加载第一页（删除/添加/月份变更后调用） */
+    /** 重置并加载第一页（月份变更后调用,触发 pagedSize 重置） */
     fun loadFirstPage() {
-        viewModelScope.launch {
-            _pagedTransactions.value = transactionRepo.getByPage(PAGE_SIZE, 0)
-            _hasMore.value = _pagedTransactions.value.size >= PAGE_SIZE &&
-                transactionRepo.getCount() > PAGE_SIZE
-        }
+        _pagedSize.value = PAGE_SIZE
     }
 
     /** 加载下一页（滚动到底时调用） */
     fun loadMore() {
-        if (_isLoadingMore.value || !_hasMore.value) return
+        if (_isLoadingMore.value || !hasMore.value) return
         // 1.0.5 防御: pagedTransactions 为空时直接返回(防止 init 阶段 snapshotFlow 误触发导致 offset=0 重复加载)
-        val current = _pagedTransactions.value
+        val current = pagedTransactions.value
         if (current.isEmpty()) return
         _isLoadingMore.value = true
         viewModelScope.launch {
-            val offset = current.size
-            val newPage = transactionRepo.getByPage(PAGE_SIZE, offset)
-            if (newPage.isEmpty()) {
-                _hasMore.value = false
-            } else {
-                _pagedTransactions.value = current + newPage
-                _hasMore.value = newPage.size >= PAGE_SIZE
-            }
+            _pagedSize.value = _pagedSize.value + PAGE_SIZE
             _isLoadingMore.value = false
         }
     }
@@ -143,8 +138,7 @@ class HomeViewModel(
         viewModelScope.launch {
             transactionRepo.delete(transaction)
             _deletedTransaction.value = transaction
-            // 触发分页重载
-            _dataVersion.value = _dataVersion.value + 1
+            // 1.0.9 修复: 删除后 Flow 自动更新,但 loadFirstPage() 重置到首屏 20 条
             loadFirstPage()
         }
     }
@@ -154,8 +148,7 @@ class HomeViewModel(
         viewModelScope.launch {
             transactionRepo.add(transaction.copy(id = 0))
             _deletedTransaction.value = null
-            // 触发分页重载
-            _dataVersion.value = _dataVersion.value + 1
+            // 1.0.9 修复: 同上
             loadFirstPage()
         }
     }

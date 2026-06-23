@@ -21,7 +21,11 @@ class FinanceNotificationService : AccessibilityService() {
 
     companion object { private const val TAG = "FT" }
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO + CoroutineExceptionHandler { _, e ->
+        // 1.0.9 修复: 协程内任何未捕获异常都不让 service 挂掉,只记日志
+        // 之前协程抛异常会触发系统 uncaughtExceptionHandler,AccessibilityService 被杀,系统弹"无法运行"
+        Log.e(TAG, "协程内未捕获异常(service 继续运行): ${e.message}", e)
+    })
     private val parsers: List<NotificationParser> = listOf(
         WeChatPayParser(),
         AlipayParser(),
@@ -62,6 +66,16 @@ class FinanceNotificationService : AccessibilityService() {
     )
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
+        // 1.0.9 修复: 顶层 try-catch 兜底,任何分支抛异常都吞掉,不让 service 挂掉
+        // 之前 onAccessibilityEvent 抛异常 → AccessibilityService 被系统杀 → 弹"无法运行"提示
+        try {
+            handleEventInternal(event)
+        } catch (t: Throwable) {
+            Log.e(TAG, "onAccessibilityEvent 异常(已吞掉,service 继续): ${t.message}", t)
+        }
+    }
+
+    private fun handleEventInternal(event: AccessibilityEvent) {
         val packageName = event.packageName?.toString() ?: return
         val isPaymentApp = parsers.any { packageName in it.supportedPackages }
 
@@ -129,6 +143,15 @@ class FinanceNotificationService : AccessibilityService() {
     }
 
     private fun handleNotification(event: AccessibilityEvent, parser: NotificationParser, packageName: String) {
+        // 1.0.9 修复: try-catch 兜底,notification 解析任何异常都吞掉,不让 service 挂掉
+        try {
+            handleNotificationInternal(event, parser, packageName)
+        } catch (t: Throwable) {
+            Log.e(TAG, "handleNotification 异常(已吞掉): ${t.message}", t)
+        }
+    }
+
+    private fun handleNotificationInternal(event: AccessibilityEvent, parser: NotificationParser, packageName: String) {
         val notif = event.parcelableData as? Notification
         val title = notif?.extras?.getCharSequence(Notification.EXTRA_TITLE)?.toString() ?: ""
         val text = notif?.extras?.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: ""
@@ -159,41 +182,51 @@ class FinanceNotificationService : AccessibilityService() {
         recentNotificationHashes[notifHash] = now
 
         scope.launch {
-            val parsed = parser.parse(packageName, title, finalText)
-            // Log all notification attempts
-            NotificationLogger.log(NotificationLogEntry(
-                timestamp = System.currentTimeMillis(),
-                packageName = packageName,
-                title = title,
-                text = finalText,
-                parsed = parsed != null,
-                parsedAmount = parsed?.amount,
-            ))
-            if (parsed != null) {
-                recordTransaction(parsed, packageName)
-                showNotification("已自动记账", "${parsed.merchant} ${String.format("%.2f", parsed.amount)}")
-            } else {
-                // 1.0.7 修复: 弹手动记账提醒的条件从"含支付/交易/付款/账单任意关键词"收窄为"标题明确是已知支付类"
-                // 避免登录提醒/卡包/优惠券等非支付消息被误弹
-                val isKnownPayTitle = payReminderTitles.any { it == title }
-                val isNonPay = nonPaySignals.any { it in title || it in text }
-                if (isKnownPayTitle && !isNonPay) {
-                    showReminderNotification(packageName)
+            try {
+                val parsed = parser.parse(packageName, title, finalText)
+                // Log all notification attempts
+                NotificationLogger.log(NotificationLogEntry(
+                    timestamp = System.currentTimeMillis(),
+                    packageName = packageName,
+                    title = title,
+                    text = finalText,
+                    parsed = parsed != null,
+                    parsedAmount = parsed?.amount,
+                ))
+                if (parsed != null) {
+                    recordTransaction(parsed, packageName)
+                    showNotification("已自动记账", "${parsed.merchant} ${String.format("%.2f", parsed.amount)}")
+                } else {
+                    // 1.0.7 修复: 弹手动记账提醒的条件从"含支付/交易/付款/账单任意关键词"收窄为"标题明确是已知支付类"
+                    // 避免登录提醒/卡包/优惠券等非支付消息被误弹
+                    val isKnownPayTitle = payReminderTitles.any { it == title }
+                    val isNonPay = nonPaySignals.any { it in title || it in text }
+                    if (isKnownPayTitle && !isNonPay) {
+                        showReminderNotification(packageName)
+                    }
                 }
+            } catch (t: Throwable) {
+                // 1.0.9 修复: 协程内解析/入库异常也兜底
+                Log.e(TAG, "通知解析/入库异常(已吞掉): ${t.message}", t)
             }
         }
     }
 
     private suspend fun captureAndParse(packageName: String, initialDelayMs: Long) {
-        if (initialDelayMs > 0) delay(initialDelayMs)
-        val root = rootInActiveWindow ?: run {
-            Log.d(TAG, "rootInActiveWindow 为 null ($packageName)")
-            return
-        }
+        // 1.0.9 修复: try-catch 兜底,屏幕解析任何异常都吞掉,不让 service 挂掉
         try {
-            handleWindowContent(root, packageName)
-        } finally {
-            root.recycle()
+            if (initialDelayMs > 0) delay(initialDelayMs)
+            val root = rootInActiveWindow ?: run {
+                Log.d(TAG, "rootInActiveWindow 为 null ($packageName)")
+                return
+            }
+            try {
+                handleWindowContent(root, packageName)
+            } finally {
+                root.recycle()
+            }
+        } catch (t: Throwable) {
+            Log.e(TAG, "captureAndParse 异常(已吞掉): ${t.message}", t)
         }
     }
 
@@ -243,6 +276,18 @@ class FinanceNotificationService : AccessibilityService() {
     }
 
     private suspend fun recordTransaction(
+        parsed: com.financetracker.domain.model.ParsedNotification,
+        packageName: String,
+    ) {
+        // 1.0.9 修复: 入库异常也兜底,不让 service 挂掉
+        try {
+            recordTransactionInternal(parsed, packageName)
+        } catch (t: Throwable) {
+            Log.e(TAG, "recordTransaction 异常(已吞掉): ${t.message}", t)
+        }
+    }
+
+    private suspend fun recordTransactionInternal(
         parsed: com.financetracker.domain.model.ParsedNotification,
         packageName: String,
     ) {

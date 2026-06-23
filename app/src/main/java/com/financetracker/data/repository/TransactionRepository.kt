@@ -16,6 +16,10 @@ class TransactionRepository(
     fun getRecent(limit: Int = 10): Flow<List<Transaction>> =
         dao.getRecent(limit).mapToDomain()
 
+    /** 1.0.9 新增: 全部交易 Flow(按日期倒序),无障碍服务写入新交易时自动推送 */
+    fun getAllTransactions(): Flow<List<Transaction>> =
+        dao.getAll().mapToDomain()
+
     /** 分页加载:按日期倒序,返回 offset..offset+limit 范围的交易 */
     suspend fun getByPage(limit: Int, offset: Int): List<Transaction> =
         dao.getByPage(limit, offset).map { it.toDomain() }
