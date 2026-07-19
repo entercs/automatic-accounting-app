@@ -56,6 +56,28 @@ fun CategoryLogo(categoryName: String, categoryIcon: String = "", size: Dp = 22.
     }
 }
 
+/**
+ * 1.1.1: 转账专用 logo — 用专门的 ic_transfer drawable,不再用 emoji 🔄
+ */
+@Composable
+fun TransferLogo(size: Dp = 22.dp, modifier: Modifier = Modifier) {
+    val resId = getTransferLogoRes()
+    if (resId != null) {
+        Image(
+            painter = painterResource(id = resId),
+            contentDescription = "转账",
+            modifier = modifier.size(size).clip(RoundedCornerShape(size / 5)),
+            contentScale = ContentScale.Fit,
+        )
+    } else {
+        Text(
+            text = "🔄",
+            fontSize = (size.value * 0.85f).sp,
+            modifier = modifier.size(size),
+        )
+    }
+}
+
 private fun getAccountEmoji(type: String, accountName: String = ""): String = when (type) {
     "wechat" -> "💬"
     "alipay" -> "🔵"

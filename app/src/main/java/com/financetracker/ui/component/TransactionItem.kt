@@ -70,11 +70,16 @@ fun TransactionItem(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             // Category icon
-            CategoryLogo(
-                categoryName = if (isTransfer) "" else (category?.name ?: ""),
-                categoryIcon = if (isTransfer) "🔄" else (category?.icon ?: "📂"),
-                size = 32.dp,
-            )
+            // 1.1.1: 转账走专门的 TransferLogo(ic_transfer drawable),其他走 CategoryLogo
+            if (isTransfer) {
+                TransferLogo(size = 32.dp)
+            } else {
+                CategoryLogo(
+                    categoryName = category?.name ?: "",
+                    categoryIcon = category?.icon ?: "📂",
+                    size = 32.dp,
+                )
+            }
             Spacer(modifier = Modifier.width(12.dp))
 
             // Info

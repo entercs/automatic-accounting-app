@@ -28,7 +28,17 @@ fun getCategoryLogoRes(categoryName: String): Int? = when {
     "餐饮" in categoryName -> R.drawable.ic_cat_dining
     "购物" in categoryName -> R.drawable.ic_cat_shopping
     "交通" in categoryName -> R.drawable.ic_cat_transport
+    "住房" in categoryName || "物业" in categoryName -> R.drawable.ic_cat_housing
+    "医疗" in categoryName || "健康" in categoryName -> R.drawable.ic_cat_medical
     "娱乐" in categoryName -> R.drawable.ic_cat_entertainment
-    "其他支出" in categoryName || "其他收入" in categoryName -> R.drawable.ic_cat_other
+    "通讯" in categoryName || "网络" in categoryName -> R.drawable.ic_cat_communication
+    // 1.1.1: 收入类分类统一走专用 drawable,不再回退到 emoji
+    "工资" in categoryName -> R.drawable.ic_income_salary
+    "退款" in categoryName || "报销" in categoryName -> R.drawable.ic_income_refund
+    "其他收入" in categoryName -> R.drawable.ic_income_other
+    "其他支出" in categoryName -> R.drawable.ic_cat_other
     else -> null
 }
+
+/** Returns drawable resource ID for the transfer icon, or null for emoji fallback */
+fun getTransferLogoRes(): Int? = R.drawable.ic_transfer

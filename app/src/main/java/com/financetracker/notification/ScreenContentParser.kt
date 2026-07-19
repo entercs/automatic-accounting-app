@@ -23,6 +23,20 @@ class ScreenContentParser {
         "京东白条付款", "白条付款", "京东付款", "京东收银台",
     )
 
+    // 1.1.1 修复: 支付结果页"返回/收银台"特征词 — 命中其一强烈暗示当前是真正的支付完成页
+    // 没有这些特征词 + 出现"消息/通知/列表/会话"等列表页特征, 则拒绝(避免微信消息列表里的过往支付被误记)
+    private val payResultPageSignals = listOf(
+        "返回商户", "完成支付", "支付完成", "交易完成",
+        "收银台", "安全键盘", "输入密码", "免密支付",
+        "支付详情", "账单详情",
+    )
+
+    // 1.1.1 修复: 列表/消息页特征词 — 出现这些强烈暗示当前是消息列表/通知中心, 不是支付结果页
+    private val listPageSignals = listOf(
+        "消息", "通知", "全部消息", "消息列表", "通知中心",
+        "会话", "聊天", "公众号", "服务通知",
+    )
+
     // 收款成功关键词（支持"你已收款""已收款""收款成功""到账"等微信/支付宝收款页文案）
     private val receiveSuccessKeywords = listOf(
         "你已收款", "已收款", "收款成功", "到账",
@@ -50,6 +64,21 @@ class ScreenContentParser {
         }
     }
 
+    /**
+     * 1.1.1 修复: 判断当前屏幕是否为支付结果页(而非消息列表/通知中心)
+     * 逻辑: 同时满足"有支付成功关键词" + "不是列表页",才算支付结果页
+     * 解决「微信消息列表里翻到微信支付公众号的过往支付消息被误识别为新交易」bug
+     */
+    fun isPaymentResultPage(texts: List<String>): Boolean {
+        if (!hasPayKeywords(texts)) return false
+        val combined = texts.joinToString(" ")
+        val hasListSignal = listPageSignals.any { it in combined }
+        val hasResultSignal = payResultPageSignals.any { it in combined }
+        // 命中列表特征 + 没有结果页特征 → 是列表页,拒绝
+        if (hasListSignal && !hasResultSignal) return false
+        return true
+    }
+
     fun parse(packageName: String, root: AccessibilityNodeInfo?): ParsedNotification? {
         if (root == null) return null
         val texts = collectTexts(root, maxNodes = 120)
@@ -62,8 +91,9 @@ class ScreenContentParser {
         // 原限制会导致京东支付成功页(底部有大量推荐广告)被误判为非支付页,京东白条 ¥25.75 识别不到。
         // 改为依赖 hasPayKeywords 关键词 + 后续金额验证,更准。
         // STRICT: must contain payment SUCCESS keywords (not just "支付")
-        if (!hasPayKeywords(texts)) {
-            Log.d(TAG, "屏幕解析: 未找到支付关键词 ($packageName), 文本=${texts.take(8)}")
+        // 1.1.1 修复: 进一步收紧 — 必须同时不是"消息列表/通知中心"页(微信消息列表里的过往支付会被误识别)
+        if (!isPaymentResultPage(texts)) {
+            Log.d(TAG, "屏幕解析: 不是支付结果页 ($packageName), 文本=${texts.take(8)}")
             return null
         }
 
