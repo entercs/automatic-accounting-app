@@ -133,6 +133,7 @@ private fun KeyButton(
         onClick = { onKey(key) },
         modifier = modifier.height(52.dp),
         shape = CardSmall,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         colors = ButtonDefaults.outlinedButtonColors(
             containerColor = if (accent) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface,
         ),

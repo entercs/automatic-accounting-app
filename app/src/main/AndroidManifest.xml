@@ -6,6 +6,8 @@
     <application
         android:name=".FinanceTrackerApp"
         android:allowBackup="true"
+        android:fullBackupContent="@xml/backup_rules"
+        android:dataExtractionRules="@xml/data_extraction_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:supportsRtl="true"
@@ -20,6 +22,16 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <service
+            android:name=".notification.PaymentNotificationListener"
+            android:label="记账助手 · 支付通知"
+            android:exported="true"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
 
         <service
             android:name=".notification.FinanceNotificationService"

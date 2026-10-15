@@ -16,12 +16,7 @@ class ScreenContentParser {
     )
 
     // 支出支付成功关键词
-    private val paySuccessKeywords = listOf(
-        "支付成功", "付款成功", "交易成功",
-        "扫码成功",
-        // 1.0.8 修复: 京东白条付款不弹系统通知,只能靠屏幕解析;同时兼容京东收银台/京东付款等文案
-        "京东白条付款", "白条付款", "京东付款", "京东收银台",
-    )
+    private val paySuccessKeywords = listOf("支付成功", "付款成功", "交易成功", "支付完成", "扣款成功")
 
     // 1.1.1 修复: 支付结果页"返回/收银台"特征词 — 命中其一强烈暗示当前是真正的支付完成页
     // 没有这些特征词 + 出现"消息/通知/列表/会话"等列表页特征, 则拒绝(避免微信消息列表里的过往支付被误记)
@@ -39,14 +34,13 @@ class ScreenContentParser {
 
     // 收款成功关键词（支持"你已收款""已收款""收款成功""到账"等微信/支付宝收款页文案）
     private val receiveSuccessKeywords = listOf(
-        "你已收款", "已收款", "收款成功", "到账",
+        "你已收款", "已收款", "收款成功", "收款到账", "退款成功", "退款到账",
     )
 
     // 微信红包已领取关键词（1.0.5 新增:微信红包没有通知,只能靠屏幕捕获）
     // 红包被拆开的页面会显示 "你已领取"/"已存入零钱"/"恭喜发财,大吉大利" 等
     private val redPacketKeywords = listOf(
-        "已存入零钱", "存入零钱", "已到账", "已领取", "你已领取",
-        "微信红包", "恭喜发财",
+        "已存入零钱", "已领取", "你已领取",
     )
 
     // Reject merchant names containing these garbage keywords
@@ -71,6 +65,7 @@ class ScreenContentParser {
      */
     fun isPaymentResultPage(texts: List<String>): Boolean {
         if (!hasPayKeywords(texts)) return false
+        if (texts.any { text -> listOf("待支付", "支付失败", "输入密码", "安全键盘", "账单详情", "交易记录").any { it in text } }) return false
         val combined = texts.joinToString(" ")
         val hasListSignal = listPageSignals.any { it in combined }
         val hasResultSignal = payResultPageSignals.any { it in combined }
@@ -99,7 +94,7 @@ class ScreenContentParser {
 
         val combined = texts.joinToString(" ")
 
-        val amount = amountPatterns.firstNotNullOfOrNull { pattern ->
+        val amount = com.financetracker.notification.parser.PaymentAmount.find(combined) ?: amountPatterns.firstNotNullOfOrNull { pattern ->
             pattern.find(combined)?.groupValues?.get(1)?.toDoubleOrNull()
         }
         if (amount == null) {
@@ -108,7 +103,7 @@ class ScreenContentParser {
         }
 
         // STRICT: amount must be reasonable
-        if (amount <= 0.01 || amount > 100000) return null
+        if (amount < 0.01 || amount > 100000) return null
 
         // 判断收入还是支出(1.0.5: 红包已领取/已存入零钱 也算收入)
         val isRedPacket = redPacketKeywords.any { kw -> texts.any { it.contains(kw) } }
@@ -168,7 +163,8 @@ class ScreenContentParser {
             packageName.contains("tencent.mm") -> "wechat"
             packageName.contains("Alipay") || packageName.contains("alipay") -> "alipay"
             packageName.contains("jingdong") -> "jd"
-            else -> "bank"
+            packageName.contains("meituan") || packageName == "com.dianping.v1" -> "meituan"
+            else -> return null
         }
 
         return ParsedNotification(amount, merchant, accountType, type, System.currentTimeMillis())
@@ -176,17 +172,17 @@ class ScreenContentParser {
 
     private fun collectTexts(node: AccessibilityNodeInfo, maxNodes: Int): List<String> {
         val result = mutableListOf<String>()
-        collectRecursive(node, result, maxNodes)
+        collectRecursive(node, result, maxNodes, 0)
         return result
     }
 
-    private fun collectRecursive(node: AccessibilityNodeInfo?, result: MutableList<String>, max: Int) {
-        if (node == null || result.size >= max) return
+    private fun collectRecursive(node: AccessibilityNodeInfo?, result: MutableList<String>, max: Int, depth: Int) {
+        if (node == null || result.size >= max || depth > 20) return
         node.text?.toString()?.trim()?.takeIf { it.length in 2..80 }?.let { result.add(it) }
         node.contentDescription?.toString()?.trim()?.takeIf { it.length in 2..80 }?.let { result.add(it) }
         for (i in 0 until node.childCount) {
             if (result.size >= max) break
-            collectRecursive(node.getChild(i), result, max)
+            collectRecursive(node.getChild(i), result, max, depth + 1)
         }
     }
 }

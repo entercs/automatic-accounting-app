@@ -22,6 +22,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -169,14 +171,13 @@ fun HomeScreen(
     Scaffold(
         floatingActionButton = {
             // 1.0.9 UI 规范: FAB 圆角 12dp(CardSmall), 主色填充, 白图标
-            FloatingActionButton(
+            ExtendedFloatingActionButton(
                 onClick = onNavigateToAdd,
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary,
-                shape = com.financetracker.ui.theme.CardSmall,
-            ) {
-                Icon(imageVector = Icons.Filled.Add, contentDescription = "记账")
-            }
+                icon = { Icon(Icons.Filled.Add, null) },
+                text = { Text("记一笔") },
+            )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
@@ -198,10 +199,6 @@ fun HomeScreen(
             }
         }
 
-        // Initially scroll past the search bar (item 0) to hide it
-        LaunchedEffect(Unit) {
-            listState.scrollToItem(1, 0)
-        }
 
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
             LazyColumn(
@@ -209,17 +206,14 @@ fun HomeScreen(
                 modifier = Modifier.fillMaxSize().padding(horizontal = com.financetracker.ui.theme.PageHorizontalPadding),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                // Search bar — initially scrolled off-screen above, pull down to reveal
                 item {
-                    OutlinedTextField(
-                        value = searchQuery,
-                        onValueChange = { searchQuery = it },
-                        placeholder = { Text("搜索…", style = MaterialTheme.typography.bodyMedium) },
-                        modifier = Modifier.fillMaxWidth().height(48.dp),
-                        shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
-                        singleLine = true,
-                        textStyle = MaterialTheme.typography.bodyMedium,
-                    )
+                    Row(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("把日子记好", style = MaterialTheme.typography.headlineMedium)
+                            Text("每一笔，都有迹可循", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        IconButton(onClick = onNavigateToSearch) { Icon(Icons.Filled.Search, "搜索全部账单") }
+                    }
                 }
 
             // 1.0.9 UI 规范: 月度结余卡片 - 渐变头 + CardLarge(16dp) + softCardShadow
@@ -232,16 +226,16 @@ fun HomeScreen(
                         .background(com.financetracker.ui.theme.HeaderGradient),
                 ) {
                     Column(
-                        modifier = Modifier.padding(com.financetracker.ui.theme.CardInnerPadding),
+                        modifier = Modifier.fillMaxWidth().padding(24.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         Text(monthLabel(), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(modifier = Modifier.height(4.dp))
                         val balance = totalIncome - totalExpense
                         val balanceColor = if (balance >= 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
-                        Text("结余", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("本月结余", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text(
-                            "${String.format("%.2f", balance)}",
+                            "¥ ${String.format("%,.2f", balance)}",
                             style = MaterialTheme.typography.displayLarge,
                             color = balanceColor,
                         )
@@ -264,12 +258,13 @@ fun HomeScreen(
 
             if (displayedTransactions.isEmpty()) {
                 item {
-                    Box(modifier = Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) {
-                        Text(
-                            if (isLoadingMore) "加载中…" else "还没有交易记录\n点击右下角按钮开始记账",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                    Card(shape = com.financetracker.ui.theme.CardLarge, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                        Column(Modifier.fillMaxWidth().padding(28.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(if (isLoadingMore) "正在整理账单…" else "从第一笔开始", style = MaterialTheme.typography.titleLarge)
+                            Spacer(Modifier.height(8.dp))
+                            Text("记下今天的收支，慢慢看见生活的节奏", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+                            TextButton(onClick = onNavigateToAdd) { Text("记一笔账") }
+                        }
                     }
                 }
             }

@@ -8,6 +8,7 @@ import com.financetracker.data.repository.StatisticsRepository.CategorySummary
 import com.financetracker.data.repository.TransactionRepository
 import com.financetracker.domain.model.TransactionType
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -85,6 +86,10 @@ class StatisticsViewModel(
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
 
+    private val _transactions = MutableStateFlow<List<com.financetracker.domain.model.Transaction>>(emptyList())
+    val transactions = _transactions.asStateFlow()
+    private val _error = MutableStateFlow<String?>(null)
+    val error = _error.asStateFlow()
     private var observeJob: Job? = null
 
     init {
@@ -100,14 +105,17 @@ class StatisticsViewModel(
     }
 
     fun setCustomStartEnd(start: Long, end: Long) {
+        if (start > end || start > System.currentTimeMillis()) return
         _period.value = StatPeriod.CUSTOM
-        _startDate.value = start
-        _endDate.value = minOf(end, System.currentTimeMillis())
+        _startDate.value = Calendar.getInstance().apply { timeInMillis = start; set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }.timeInMillis
+        _endDate.value = Calendar.getInstance().apply { timeInMillis = minOf(end, System.currentTimeMillis()); set(Calendar.HOUR_OF_DAY, 23); set(Calendar.MINUTE, 59); set(Calendar.SECOND, 59); set(Calendar.MILLISECOND, 999) }.timeInMillis
+        _canGoNext.value = false
         updateHeader()
         startObserving()
     }
 
     fun previous() {
+        if (_period.value == StatPeriod.CUSTOM) return
         _offset.value -= 1
         setCustomRange()
         startObserving()
@@ -129,7 +137,8 @@ class StatisticsViewModel(
                 // Current week: Monday to Sunday
                 cal.timeInMillis = now
                 cal.add(Calendar.WEEK_OF_YEAR, _offset.value)
-                cal.set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)
+                val daysFromMonday = (cal.get(Calendar.DAY_OF_WEEK) + 5) % 7
+                cal.add(Calendar.DAY_OF_MONTH, -daysFromMonday)
                 cal.set(Calendar.HOUR_OF_DAY, 0); cal.set(Calendar.MINUTE, 0); cal.set(Calendar.SECOND, 0); cal.set(Calendar.MILLISECOND, 0)
                 _startDate.value = cal.timeInMillis
                 val weekStart = cal.timeInMillis
@@ -149,8 +158,7 @@ class StatisticsViewModel(
                 cal.add(Calendar.MILLISECOND, -1)
                 _endDate.value = cal.timeInMillis
                 // Check if next month exists
-                val periodEnd = minOf(cal.timeInMillis, now)
-                _canGoNext.value = periodEnd < now || (cal.timeInMillis - 86400000) <= now
+                _canGoNext.value = _offset.value < 0
             }
             StatPeriod.YEAR -> {
                 cal.timeInMillis = now
@@ -179,9 +187,17 @@ class StatisticsViewModel(
         val start = _startDate.value
         val end = _endDate.value
         observeJob = viewModelScope.launch {
-            transactionRepo.getByMonth(start, end + 1).collect {
-                loadData(start, end + 1)
-            }
+            _isRefreshing.value = true
+            _error.value = null
+            try {
+                transactionRepo.getByMonth(start, end + 1).collect {
+                    _transactions.value = it
+                    loadData(start, end + 1)
+                    _isRefreshing.value = false
+                }
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { _error.value = "暂时无法加载统计，请重试" }
+            finally { _isRefreshing.value = false }
         }
     }
 
@@ -189,14 +205,9 @@ class StatisticsViewModel(
         _selectedType.value = if (_selectedType.value == type) null else type
     }
 
-    fun refresh() {
-        if (_isRefreshing.value) return
-        _isRefreshing.value = true
-        viewModelScope.launch {
-            loadData(_startDate.value, _endDate.value + 1)
-            _isRefreshing.value = false
-        }
-    }
+    fun selectType(type: TransactionType?) { _selectedType.value = type }
+
+    fun refresh() { startObserving() }
 
     private suspend fun loadData(start: Long, end: Long) {
         _expenseTotal.value = statisticsRepo.getMonthlyExpenseTotal(start, end)
@@ -208,7 +219,14 @@ class StatisticsViewModel(
 
         // Previous period
         val duration = end - start
-        val prevStart = start - duration
+        val previous = Calendar.getInstance().apply { timeInMillis = start }
+        when (_period.value) {
+            StatPeriod.MONTH -> previous.add(Calendar.MONTH, -1)
+            StatPeriod.YEAR -> previous.add(Calendar.YEAR, -1)
+            StatPeriod.WEEK -> previous.add(Calendar.DAY_OF_MONTH, -7)
+            StatPeriod.CUSTOM -> previous.timeInMillis = start - duration
+        }
+        val prevStart = previous.timeInMillis
         val prevEnd = start
         _prevExpenseTotal.value = statisticsRepo.getMonthlyExpenseTotal(prevStart, prevEnd)
         _prevIncomeTotal.value = statisticsRepo.getMonthlyIncomeTotal(prevStart, prevEnd)

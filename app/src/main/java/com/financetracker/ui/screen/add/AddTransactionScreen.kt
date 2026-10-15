@@ -139,8 +139,9 @@ fun AddTransactionScreen(editTransactionId: Long? = null, refundTransactionId: L
         Column(
             modifier = Modifier.fillMaxSize().padding(padding),
         ) {
-            IconButton(onClick = onNavigateBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onNavigateBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回") }
+                Text(if (editTransactionId != null) "编辑账单" else "记一笔", style = MaterialTheme.typography.titleLarge)
             }
             LazyColumn(
                 modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp),
@@ -154,6 +155,8 @@ fun AddTransactionScreen(editTransactionId: Long? = null, refundTransactionId: L
                             value = amount,
                             onValueChange = { viewModel.setAmount(it) },
                             label = { Text("金额") },
+                            prefix = { Text("¥ ", style = MaterialTheme.typography.headlineSmall) },
+                            shape = CardLarge,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                             modifier = Modifier.weight(1f),
                             textStyle = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Bold),

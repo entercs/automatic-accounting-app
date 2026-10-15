@@ -68,10 +68,10 @@ interface TransactionDao {
     suspend fun countByAccountId(accountId: Long): Int
 
     @Query("""
-        SELECT (date + 28800000) / 86400000 * 86400000 - 28800000 as dayStart, SUM(amount) as total
+        SELECT CAST(strftime('%s', date(date / 1000, 'unixepoch', 'localtime'), 'utc') AS INTEGER) * 1000 as dayStart, SUM(amount) as total
         FROM transactions
         WHERE type = :type AND date >= :start AND date < :end
-        GROUP BY (date + 28800000) / 86400000 ORDER BY dayStart
+        GROUP BY date(date / 1000, 'unixepoch', 'localtime') ORDER BY dayStart
     """)
     suspend fun getDailyTotals(type: String, start: Long, end: Long): List<DailyTotal>
 }

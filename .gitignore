@@ -26,3 +26,6 @@ local.properties
 /docs/
 # 1.1.1+ 调整: Logo/ 原始素材不入 git(2MB+ PNG,只本地维护;处理后的 ic_*.png 才入 res/drawable)
 /Logo/
+
+# Local preview and install artifacts
+/artifacts/

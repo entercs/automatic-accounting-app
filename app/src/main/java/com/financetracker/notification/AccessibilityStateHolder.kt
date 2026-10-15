@@ -21,6 +21,10 @@ object AccessibilityStateHolder {
     private val _isEnabled = MutableStateFlow(false)
     val isEnabled: StateFlow<Boolean> = _isEnabled.asStateFlow()
 
+    private val _isConnected = MutableStateFlow(false)
+    val isConnected: StateFlow<Boolean> = _isConnected.asStateFlow()
+    fun setConnected(value: Boolean) { _isConnected.value = value; refresh() }
+
     private var manager: AccessibilityManager? = null
 
     /** 应用启动时调用一次,注册全局监听器 */
@@ -47,5 +51,6 @@ object AccessibilityStateHolder {
         val enabledServices = am.getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_GENERIC)
         val ourServiceEnabled = enabledServices.any { it.id?.contains("FinanceNotification") == true }
         _isEnabled.value = ourServiceEnabled
+        if (!ourServiceEnabled) _isConnected.value = false
     }
 }

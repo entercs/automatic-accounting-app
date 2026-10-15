@@ -6,24 +6,24 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.financetracker.domain.model.Banks
 
-// 1.0.9 UI 规范: 莫兰迪色系(低饱和,极简轻奢)
+// Warm cream surfaces, sage accents and terracotta expenses.
 // 品牌主色(薄荷绿)
-val Mint500 = Color(0xFF73C991)
-val Mint700 = Color(0xFF4FA274)
+val Mint500 = Color(0xFF607B61)
+val Mint700 = Color(0xFF49664B)
 // 支出色(砖红)
-val Brick500 = Color(0xFFE75C5C)
-val Brick700 = Color(0xFFC04040)
+val Brick500 = Color(0xFFB85F48)
+val Brick700 = Color(0xFF984B38)
 // 暖橙(图表/辅助强调)
-val Amber500 = Color(0xFFFF9529)
+val Amber500 = Color(0xFFBA8B46)
 // 雾霾蓝(购物分类/次要图表)
-val Mist500 = Color(0xFF5294E3)
+val Mist500 = Color(0xFF758C9B)
 
 // 中性色(规范第二/三节)
-val PageBg = Color(0xFFF7F7FA)       // 页面底色
-val TextPrimary = Color(0xFF222222)  // 一级文字(核心数字/标题)
-val TextSecondary = Color(0xFF555555) // 二级文字(正文/分类/商户)
-val TextTertiary = Color(0xFF999999)  // 辅助文字(时间/备注/未选中Tab)
-val Divider = Color(0xFFEEEEEE)       // 分割线/边框
+val PageBg = Color(0xFFFAF6EE)       // 页面底色
+val TextPrimary = Color(0xFF3B332B)  // 一级文字(核心数字/标题)
+val TextSecondary = Color(0xFF776B5D) // 二级文字(正文/分类/商户)
+val TextTertiary = Color(0xFF8B7C6B)  // 辅助文字(时间/备注/未选中Tab)
+val Divider = Color(0xFFE9E1D4)       // 分割线/边框
 
 // 账户品牌色(规范未覆盖,保留)
 val WeChatGreen = Color(0xFF07C160)
@@ -71,6 +71,6 @@ val PieChartColors = listOf(
     Mint500,       // 其他支出 #73C991
     Mist500,       // 购物消费 #5294E3
     Amber500,      // 餐饮日常 #FF9529
-    Color(0xFFF25549),  // 汽车交通 #F25549
-    Color(0xFFA168C7),  // 通讯网络 #A168C7
+    Color(0xFFC98972),  // 汽车交通 #F25549
+    Color(0xFF9C8DA5),  // 通讯网络 #A168C7
 )

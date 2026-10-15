@@ -52,7 +52,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.DpOffset
@@ -73,7 +73,7 @@ import com.financetracker.ui.theme.softCardShadow
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
-fun SettingsScreen() {
+fun SettingsScreen(onNavigateToAdd: () -> Unit = {}) {
     val context = LocalContext.current
     val factory = remember {
         SettingsViewModel.Factory(
@@ -117,6 +117,13 @@ fun SettingsScreen() {
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp),
         ) {
+            item {
+                Column(Modifier.padding(top = 8.dp, bottom = 20.dp)) {
+                    Text("我的钱包", style = MaterialTheme.typography.headlineMedium)
+                    Text("管理资产，让自动记账保持在线", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            item { com.financetracker.ui.component.AccountingHealthCard(onManualAdd = onNavigateToAdd); Spacer(Modifier.height(20.dp)) }
             // 1.0.9 UI 规范: 净资产卡片 - 渐变头 + CardLarge(16dp) + softCardShadow
             item {
                 val totalAssets = accounts.sumOf { it.balance }
@@ -129,7 +136,7 @@ fun SettingsScreen() {
                         .background(HeaderGradient),
                 ) {
                     Column(
-                        modifier = Modifier.padding(20.dp),
+                        modifier = Modifier.fillMaxWidth().padding(24.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         Text("净资产", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -200,7 +207,8 @@ fun SettingsScreen() {
                             }
 
                             if (showDialog) {
-                                var tempBalance by remember { mutableStateOf("") }
+                                var tempBalance by remember(acc.id) { mutableStateOf(String.format(java.util.Locale.US, "%.2f", acc.balance)) }
+                                var balanceEdited by remember(acc.id) { mutableStateOf(false) }
                                 AlertDialog(
                                     onDismissRequest = { showDialog = false },
                                     title = {
@@ -234,6 +242,7 @@ fun SettingsScreen() {
                                             // Keypad
                                             BalanceKeypad(
                                                 onKey = { key ->
+                                                    if (!balanceEdited) { tempBalance = ""; balanceEdited = true }
                                                     if (key == "." && tempBalance.contains(".")) return@BalanceKeypad
                                                     if (tempBalance == "0" && key != ".") {
                                                         tempBalance = key
@@ -431,43 +440,6 @@ fun SettingsScreen() {
                         Text("导出失败: ${state.message}", color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
                     }
                     else -> {}
-                }
-            }
-
-            // ── Notification monitoring (bottom) ──
-            item {
-                Text("通知监听", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(bottom = 8.dp))
-                Card(
-                    modifier = Modifier.fillMaxWidth().softCardShadow(),
-                    shape = CardLarge,
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("自动记账", style = MaterialTheme.typography.bodyLarge)
-                            Text(
-                                if (isAccessibilityEnabled) "无障碍已开启，正在监听通知和屏幕"
-                                   else "无障碍未开启，无法自动记账",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = if (isAccessibilityEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        // Switch 反映真实无障碍状态，点击跳系统设置
-                        Switch(
-                            checked = isAccessibilityEnabled,
-                            onCheckedChange = { _ ->
-                                viewModel.openAccessibilitySettings()
-                            },
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.height(4.dp))
-                TextButton(onClick = {
-                    viewModel.openAccessibilitySettings()
-                }) {
-                    Text(if (isAccessibilityEnabled) "管理无障碍设置" else "前往无障碍设置")
                 }
             }
 

@@ -86,7 +86,7 @@ class AlipayParser : NotificationParser {
         }
 
         // 提取金额
-        var amount = amountYuanPattern.find(combined)?.groupValues?.get(1)?.toDoubleOrNull()
+        var amount = PaymentAmount.find(combined) ?: amountYuanPattern.find(combined)?.groupValues?.get(1)?.toDoubleOrNull()
         if (amount == null) {
             amount = amountSymbolPattern.find(combined)?.groupValues?.get(1)?.toDoubleOrNull()
         }
@@ -116,7 +116,7 @@ class AlipayParser : NotificationParser {
 
         // 判断收入还是支出（1.0.7 修复：优先看明确的支出信号,避免"小荷包支付红包"等"红包"误判为收入）
         val isExpense = expenseKeywords.any { combined.contains(it) }
-        val isIncome = !isExpense && incomeKeywords.any { combined.contains(it) }
+        val isIncome = Regex("退款成功|退款到账|退款已到账|收款成功|收款到账|转账到账|已入账").containsMatchIn(combined) || (!isExpense && incomeKeywords.any { combined.contains(it) })
         val type = if (isIncome) TransactionType.INCOME else TransactionType.EXPENSE
 
         // 提取商户

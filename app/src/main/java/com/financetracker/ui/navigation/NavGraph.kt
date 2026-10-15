@@ -38,7 +38,7 @@ fun NavGraph(navController: NavHostController, modifier: Modifier = Modifier) {
             enterTransition = { fadeIn(tween(ANIM_DURATION)) },
             exitTransition = { fadeOut(tween(ANIM_DURATION)) },
         ) {
-            StatisticsScreen()
+            StatisticsScreen(onTransactionClick = { id -> navController.navigate(Screen.detailRoute(id)) })
         }
         composable(Screen.Search.route) {
             SearchScreen(
@@ -50,7 +50,7 @@ fun NavGraph(navController: NavHostController, modifier: Modifier = Modifier) {
             enterTransition = { fadeIn(tween(ANIM_DURATION)) },
             exitTransition = { fadeOut(tween(ANIM_DURATION)) },
         ) {
-            SettingsScreen()
+            SettingsScreen(onNavigateToAdd = { navController.navigate(Screen.addTransactionRoute()) })
         }
         composable(
             route = Screen.AddTransaction.route,

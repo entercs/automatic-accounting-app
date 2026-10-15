@@ -23,8 +23,9 @@ import kotlinx.coroutines.launch
         CategoryEntity::class,
         PaymentAccountEntity::class,
         ParsingRuleEntity::class,
+        com.financetracker.data.db.entity.AccountingReceipt::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = false,
 )
 abstract class AppDatabase : androidx.room.RoomDatabase() {
@@ -32,8 +33,15 @@ abstract class AppDatabase : androidx.room.RoomDatabase() {
     abstract fun categoryDao(): CategoryDao
     abstract fun paymentAccountDao(): PaymentAccountDao
     abstract fun parsingRuleDao(): ParsingRuleDao
+    abstract fun accountingReceiptDao(): com.financetracker.data.db.dao.AccountingReceiptDao
 
     companion object {
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS accounting_receipts (eventId TEXT NOT NULL PRIMARY KEY, createdAt INTEGER NOT NULL)")
+            }
+        }
+
         private val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE payment_accounts ADD COLUMN color TEXT NOT NULL DEFAULT '#4CAF50'")
@@ -106,6 +114,7 @@ abstract class AppDatabase : androidx.room.RoomDatabase() {
         fun create(context: Context): AppDatabase {
             return Room.databaseBuilder(context, AppDatabase::class.java, "finance_tracker.db")
                 .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                .addMigrations(MIGRATION_6_7)
                 .addCallback(SeedCallback())
                 .build()
         }

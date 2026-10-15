@@ -82,6 +82,8 @@ class JDPayParser : NotificationParser {
             if (!hasPaymentAction) return null
         }
 
+        if (!paymentActionKeywords.any { it in combined } && "退款" !in combined) return null
+
         // 提取所有金额
         val amounts = mutableListOf<Double>()
 
@@ -108,7 +110,7 @@ class JDPayParser : NotificationParser {
         }
 
         // 优先取最大金额（通常是实际交易金额）
-        val amount = amounts.maxOrNull() ?: return null
+        val amount = PaymentAmount.find(combined) ?: amounts.distinct().singleOrNull() ?: return null
 
         // 判断收入还是支出
         val isIncome = incomeKeywords.any { combined.contains(it) }

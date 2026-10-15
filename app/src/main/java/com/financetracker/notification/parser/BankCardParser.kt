@@ -45,7 +45,7 @@ class BankCardParser : NotificationParser {
     // 非交易类标题（账户/营销/积分/额度）一律跳过
     private val nonTransactionTitles = listOf(
         "额度", "积分", "优惠券", "理财", "活动", "营销",
-        "白条", "信用", "账单日", "还款提醒", "还款日",
+        "白条额度", "信用额度", "账单日", "还款提醒", "还款日",
         "推广", "广告", "公告", "服务通知"
     )
 
@@ -66,8 +66,10 @@ class BankCardParser : NotificationParser {
             return null
         }
 
+        if (!(incomeKeywords + expenseKeywords).any { it in combined }) return null
+
         // 提取金额
-        var amount = amountSymbolPattern.find(combined)?.groupValues?.get(1)?.toDoubleOrNull()
+        var amount = PaymentAmount.find(combined) ?: amountSymbolPattern.find(combined)?.groupValues?.get(1)?.toDoubleOrNull()
         if (amount == null) {
             amount = amountYuanPattern.find(combined)?.groupValues?.get(1)?.toDoubleOrNull()
         }

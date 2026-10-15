@@ -13,7 +13,7 @@ fun BottomNavBar(
     onItemClick: (Screen) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    NavigationBar(modifier = modifier) {
+    NavigationBar(modifier = modifier, containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surface, tonalElevation = androidx.compose.ui.unit.Dp(0f)) {
         Screen.bottomNavItems.forEach { screen ->
             NavigationBarItem(
                 selected = currentRoute == screen.route,

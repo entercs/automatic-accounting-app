@@ -38,7 +38,7 @@ class WeChatPayParser : NotificationParser {
 
         val combined = "$title $text"
 
-        var amount = amountSymbolPattern.find(combined)?.groupValues?.get(1)?.toDoubleOrNull()
+        var amount = PaymentAmount.find(combined) ?: amountSymbolPattern.find(combined)?.groupValues?.get(1)?.toDoubleOrNull()
         if (amount == null) {
             amount = amountYuanPattern.find(combined)?.groupValues?.get(1)?.toDoubleOrNull()
         }
@@ -49,7 +49,7 @@ class WeChatPayParser : NotificationParser {
         if (amount == null) return null
 
         // 判断收入还是支出
-        val isIncome = incomeKeywords.any { combined.contains(it) }
+        val isIncome = Regex("收款到账|收款成功|收到.*(?:转账|收款)|退款成功|退款到账|已存入零钱|入账|转入|到账通知").containsMatchIn(combined) || title == "收款通知"
         val type = if (isIncome) TransactionType.INCOME else TransactionType.EXPENSE
 
         // 提取商户: 红包通知的发送人来自"来自XX的红包",其他用原有 pattern

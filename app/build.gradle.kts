@@ -13,8 +13,9 @@ android {
         applicationId = "com.financetracker"
         minSdk = 26
         targetSdk = 35
-        versionCode = 12
-        versionName = "1.1.1"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        versionCode = 13
+        versionName = "1.2.0"
     }
 
     buildTypes {
@@ -43,6 +44,9 @@ android {
 }
 
 dependencies {
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    testImplementation("junit:junit:4.13.2")
     // Compose BOM
     val composeBom = platform("androidx.compose:compose-bom:2024.12.01")
     implementation(composeBom)
