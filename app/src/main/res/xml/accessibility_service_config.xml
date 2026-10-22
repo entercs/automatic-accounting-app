@@ -4,5 +4,6 @@
     android:accessibilityEventTypes="typeNotificationStateChanged|typeWindowContentChanged|typeWindowStateChanged"
     android:accessibilityFeedbackType="feedbackGeneric"
     android:notificationTimeout="100"
+    android:packageNames="com.tencent.mm,com.eg.android.AlipayGphone,com.eg.android.AlipayGphoneRC,com.jingdong.app.mall,com.sankuai.meituan,com.sankuai.meituan.takeoutnew,com.dianping.v1"
     android:canRetrieveWindowContent="true"
     android:description="@string/app_name" />

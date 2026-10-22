@@ -16,15 +16,26 @@ class FinanceNotificationService : AccessibilityService() {
     private var capture: Job? = null
     private var lastCapture = 0L
     private var lastContent = ""
-    private val screenPackages = setOf("com.tencent.mm", "com.eg.android.AlipayGphone", "com.eg.android.AlipayGphoneRC", "com.jingdong.app.mall", "com.taobao.taobao", "com.tmall.wireless", "com.sankuai.meituan", "com.sankuai.meituan.takeoutnew")
+    companion object {
+        private var active = java.lang.ref.WeakReference<FinanceNotificationService>(null)
+        fun disableScreenRecognition(): Boolean {
+            val service = active.get() ?: return false
+            service.disableSelf()
+            AccessibilityStateHolder.setConnected(false)
+            return true
+        }
+    }
 
     override fun onServiceConnected() {
         super.onServiceConnected()
+        serviceInfo = serviceInfo.apply { packageNames = ScreenCapturePolicy.packages.toTypedArray() }
+        active = java.lang.ref.WeakReference(this)
         AccessibilityStateHolder.setConnected(true)
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
         val pkg = event.packageName?.toString() ?: return
+        if (!ScreenCapturePolicy.allows(pkg)) return
         try {
             if (event.eventType == AccessibilityEvent.TYPE_NOTIFICATION_STATE_CHANGED) {
                 // Legacy fallback for existing users who have not granted notification access yet.
@@ -33,7 +44,7 @@ class FinanceNotificationService : AccessibilityService() {
                 }
                 return
             }
-            if (pkg !in screenPackages || capture?.isActive == true || System.currentTimeMillis() - lastCapture < 1500) return
+            if (!ScreenCapturePolicy.allows(pkg) || capture?.isActive == true || System.currentTimeMillis() - lastCapture < 1500) return
             capture = scope.launch {
                 try {
                     delay(150)
@@ -66,6 +77,7 @@ class FinanceNotificationService : AccessibilityService() {
     override fun onInterrupt() { /* System interruption does not mean the service was unbound. */ }
     override fun onUnbind(intent: Intent?): Boolean { AccessibilityStateHolder.setConnected(false); return super.onUnbind(intent) }
     override fun onDestroy() {
+        if (active.get() === this) active.clear()
         AccessibilityStateHolder.setConnected(false)
         scope.cancel()
         super.onDestroy()

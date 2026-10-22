@@ -13,6 +13,7 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
     data object Statistics : Screen("statistics", "统计", Icons.Filled.PieChart)
     data object Search : Screen("search", "搜索", Icons.Filled.Search)
     data object Settings : Screen("settings", "我的", Icons.Filled.Person)
+    data object Preferences : Screen("preferences", "设置", Icons.Filled.Person)
     data object AddTransaction : Screen("add_transaction?editId={editId}", "记账", Icons.Filled.AddCircle)
     data object TransactionDetail : Screen("transaction_detail/{transactionId}", "详情", Icons.Filled.Home)
 

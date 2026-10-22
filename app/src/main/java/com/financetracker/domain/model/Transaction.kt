@@ -10,6 +10,7 @@ data class Transaction(
     val merchant: String = "",
     val note: String = "",
     val reimbursable: Boolean = false,
+    val reimbursed: Boolean = false,
     val date: Long,
     val source: String = "manual",
 )

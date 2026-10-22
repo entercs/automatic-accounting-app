@@ -1,5 +1,6 @@
 package com.financetracker.data.db.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -33,6 +34,7 @@ data class TransactionEntity(
     val merchant: String = "",
     val note: String = "",
     val reimbursable: Boolean = false,
+    @ColumnInfo(defaultValue = "0") val reimbursed: Boolean = false,
     val date: Long, // epoch millis
     val source: String = "manual",
 )

@@ -1,120 +1,56 @@
 package com.financetracker.ui.component
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.financetracker.domain.calculator.MoneyExpression
 import com.financetracker.ui.theme.CardSmall
-
-// 1.0.9 UI 规范: 数字键盘 - 按键 CardSmall(12dp), 完成按钮 CardSmall+主色填充+白字
-@Composable
-fun BalanceKeypad(
-    onKey: (String) -> Unit,
-    onBackspace: () -> Unit,
-    onDone: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        // Row 1: 1 2 3
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            listOf("1", "2", "3").forEach { key ->
-                NumericKeyButton(key = key, onClick = { onKey(key) }, modifier = Modifier.weight(1f))
-            }
-        }
-        // Row 2: 4 5 6
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            listOf("4", "5", "6").forEach { key ->
-                NumericKeyButton(key = key, onClick = { onKey(key) }, modifier = Modifier.weight(1f))
-            }
-        }
-        // Row 3: 7 8 9
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            listOf("7", "8", "9").forEach { key ->
-                NumericKeyButton(key = key, onClick = { onKey(key) }, modifier = Modifier.weight(1f))
-            }
-        }
-        // Row 4: . 0 ⌫
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            NumericKeyButton(key = ".", onClick = { onKey(".") }, modifier = Modifier.weight(1f))
-            NumericKeyButton(key = "0", onClick = { onKey("0") }, modifier = Modifier.weight(1f))
-            OutlinedButton(
-                onClick = onBackspace,
-                modifier = Modifier.weight(1f).height(48.dp),
-                shape = CardSmall,
-            ) {
-                Text("⌫", fontSize = 18.sp)
-            }
-        }
-        // Row 5: - toggle + 完成主按钮
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            OutlinedButton(
-                onClick = { onKey("-") },
-                modifier = Modifier.weight(1f).height(48.dp),
-                shape = CardSmall,
-            ) {
-                Text("−", fontSize = 20.sp)
-            }
-            Button(
-                onClick = onDone,
-                modifier = Modifier.weight(2f).height(48.dp),
-                shape = CardSmall,
-                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                ),
-            ) {
-                Text("完成", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-            }
-        }
-    }
-}
+import java.math.BigDecimal
 
 @Composable
-private fun NumericKeyButton(
-    key: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    OutlinedButton(
-        onClick = onClick,
-        modifier = modifier.height(48.dp),
-        shape = CardSmall,
-    ) {
-        Text(
-            text = key,
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Medium,
-        )
+fun BalanceCalculator(initialBalance: Double, onDone: (Double) -> Unit, modifier: Modifier = Modifier, doneLabel: String = "保存余额") {
+    var expression by rememberSaveable(initialBalance) { mutableStateOf(BigDecimal.valueOf(initialBalance).stripTrailingZeros().toPlainString()) }
+    var replaceOnDigit by rememberSaveable(initialBalance) { mutableStateOf(true) }
+    val result = remember(expression) { MoneyExpression.evaluate(expression) }
+    val hasOperation = expression.drop(1).any { it == '+' || it == '-' }
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Surface(shape = CardSmall, color = MaterialTheme.colorScheme.surfaceVariant) {
+            Column(Modifier.fillMaxWidth().padding(16.dp), horizontalAlignment = Alignment.End) {
+                Text("账户余额 · 支持加减", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(expression.ifBlank { "0" }, style = MaterialTheme.typography.headlineSmall, maxLines = 2)
+                Text(if (hasOperation && result != null) "= ${result.toPlainString()}" else "可输入负数，表示负债", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        listOf(listOf("7", "8", "9", "⌫"), listOf("4", "5", "6", "+"), listOf("1", "2", "3", "−"), listOf("C", "0", ".", "=")).forEach { keys ->
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                keys.forEach { label ->
+                    OutlinedButton(onClick = {
+                        when (label) {
+                            "C" -> { expression = ""; replaceOnDigit = false }
+                            "⌫" -> { expression = expression.dropLast(1); replaceOnDigit = false }
+                            "=" -> result?.let { expression = it.stripTrailingZeros().toPlainString(); replaceOnDigit = true }
+                            "+", "−" -> { expression = MoneyExpression.append(expression, if (label == "−") "-" else "+"); replaceOnDigit = false }
+                            else -> {
+                                expression = MoneyExpression.append(if (replaceOnDigit) "" else expression, label)
+                                replaceOnDigit = false
+                            }
+                        }
+                    }, modifier = Modifier.weight(1f).height(46.dp), shape = CardSmall,
+                        contentPadding = PaddingValues(0.dp), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                        colors = ButtonDefaults.outlinedButtonColors(containerColor = if (label in listOf("+", "−", "=")) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface)) {
+                        Text(label, fontSize = 20.sp, fontWeight = FontWeight.Medium)
+                    }
+                }
+            }
+        }
+        Button(onClick = { result?.let { onDone(it.toDouble()) } }, enabled = result != null,
+            modifier = Modifier.fillMaxWidth(), shape = CardSmall) { Text(doneLabel) }
     }
 }

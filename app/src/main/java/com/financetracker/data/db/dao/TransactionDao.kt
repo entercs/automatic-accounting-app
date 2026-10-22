@@ -52,6 +52,27 @@ interface TransactionDao {
     fun search(query: String): Flow<List<TransactionEntity>>
 
     @Query("""
+        SELECT * FROM transactions
+        WHERE (:query = '' OR merchant LIKE '%' || :query || '%'
+            OR note LIKE '%' || :query || '%'
+            OR CAST(amount AS TEXT) LIKE '%' || :query || '%'
+            OR accountId IN (SELECT id FROM payment_accounts WHERE name LIKE '%' || :query || '%')
+            OR categoryId IN (SELECT id FROM categories WHERE name LIKE '%' || :query || '%'))
+        AND (:hasCategories = 0 OR categoryId IN (:categoryIds))
+        AND (:hasPaymentTypes = 0
+            OR accountId IN (SELECT id FROM payment_accounts WHERE type IN (:paymentTypes))
+            OR (transactions.type = 'TRANSFER' AND transferToAccountId IN (SELECT id FROM payment_accounts WHERE type IN (:paymentTypes))))
+        AND (:reimbursement = 'ALL'
+            OR (:reimbursement = 'PENDING' AND type = 'EXPENSE' AND reimbursable = 1 AND reimbursed = 0)
+            OR (:reimbursement = 'REIMBURSED' AND type = 'EXPENSE' AND reimbursable = 1 AND reimbursed = 1))
+        ORDER BY date DESC, id DESC
+    """)
+    fun filter(query: String, hasCategories: Boolean, categoryIds: List<Long>, reimbursement: String, hasPaymentTypes: Boolean, paymentTypes: List<String>): Flow<List<TransactionEntity>>
+
+    @Query("UPDATE transactions SET reimbursed = :completed WHERE id = :id AND type = 'EXPENSE' AND reimbursable = 1")
+    suspend fun setReimbursed(id: Long, completed: Boolean)
+
+    @Query("""
         SELECT SUM(amount) FROM transactions
         WHERE type = :type AND date >= :startOfMonth AND date < :endOfMonth
     """)

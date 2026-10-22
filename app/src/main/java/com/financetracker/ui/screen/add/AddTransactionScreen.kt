@@ -23,8 +23,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DatePicker
-import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -34,7 +32,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -57,6 +54,7 @@ import com.financetracker.di.AppModule
 import com.financetracker.domain.model.Category
 import com.financetracker.domain.model.PaymentAccount
 import com.financetracker.domain.model.TransactionType
+import com.financetracker.ui.component.DateTimeWheelDialog
 import com.financetracker.ui.component.CalculatorKeypad
 import com.financetracker.ui.component.SegmentedTab
 import com.financetracker.ui.component.VoiceInputButton
@@ -91,6 +89,7 @@ fun AddTransactionScreen(editTransactionId: Long? = null, refundTransactionId: L
     val selectedCategoryId by viewModel.selectedCategoryId.collectAsState()
     val selectedAccountId by viewModel.selectedAccountId.collectAsState()
     val transferToAccountId by viewModel.transferToAccountId.collectAsState()
+    val reimbursed by viewModel.reimbursed.collectAsState()
     val reimbursable by viewModel.reimbursable.collectAsState()
     val merchant by viewModel.merchant.collectAsState()
     val note by viewModel.note.collectAsState()
@@ -104,7 +103,6 @@ fun AddTransactionScreen(editTransactionId: Long? = null, refundTransactionId: L
 
     var showDatePicker by remember { mutableStateOf(false) }
     var showAccountPicker by remember { mutableStateOf(false) }
-    val datePickerState = rememberDatePickerState(initialSelectedDateMillis = date)
 
     LaunchedEffect(saved) {
         if (saved) onNavigateBack()
@@ -139,14 +137,23 @@ fun AddTransactionScreen(editTransactionId: Long? = null, refundTransactionId: L
         Column(
             modifier = Modifier.fillMaxSize().padding(padding),
         ) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            // Keep the operation visible even when the form is scrolled.
+            Row(Modifier.fillMaxWidth().padding(end = 16.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onNavigateBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回") }
-                Text(if (editTransactionId != null) "编辑账单" else "记一笔", style = MaterialTheme.typography.titleLarge)
+                SegmentedTab(
+                    options = listOf("支出" to TransactionType.EXPENSE, "收入" to TransactionType.INCOME, "转账" to TransactionType.TRANSFER),
+                    selected = selectedType,
+                    onSelect = viewModel::setType,
+                    modifier = Modifier.weight(1f),
+                )
             }
             LazyColumn(
                 modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
+                if (editTransactionId != null) item {
+                    Text("编辑账单", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
                 // Amount
                 item {
                     Spacer(modifier = Modifier.height(4.dp))
@@ -170,19 +177,6 @@ fun AddTransactionScreen(editTransactionId: Long? = null, refundTransactionId: L
                     }
                 }
 
-                // 1.0.9 UI 规范: 类型切换 Tab - 用 SegmentedTab 替代卡片色块(禁止色块高亮)
-                item {
-                    SegmentedTab(
-                        options = listOf(
-                            "支出" to TransactionType.EXPENSE,
-                            "收入" to TransactionType.INCOME,
-                            "转账" to TransactionType.TRANSFER,
-                        ),
-                        selected = selectedType,
-                        onSelect = { viewModel.setType(it) },
-                    )
-                }
-
                 // Reimbursable toggle (right after type, only for expense)
                 if (selectedType == TransactionType.EXPENSE) {
                     item {
@@ -198,7 +192,10 @@ fun AddTransactionScreen(editTransactionId: Long? = null, refundTransactionId: L
                                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Text("可报销", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                                Column(Modifier.weight(1f)) {
+                                    Text("需要报销", style = MaterialTheme.typography.bodyMedium)
+                                    if (reimbursable) Text(if (reimbursed) "已报销" else "待报销 · 可在查账中筛选", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
                                 Switch(checked = reimbursable, onCheckedChange = { viewModel.setReimbursable(it) })
                             }
                         }
@@ -311,20 +308,11 @@ fun AddTransactionScreen(editTransactionId: Long? = null, refundTransactionId: L
     }
 
     if (showDatePicker) {
-        DatePickerDialog(
-            onDismissRequest = { showDatePicker = false },
-            confirmButton = {
-                TextButton(onClick = {
-                    datePickerState.selectedDateMillis?.let { viewModel.setDate(it) }
-                    showDatePicker = false
-                }) { Text("确定") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDatePicker = false }) { Text("取消") }
-            },
-        ) {
-            DatePicker(state = datePickerState)
-        }
+        DateTimeWheelDialog(
+            initialMillis = date,
+            onDismiss = { showDatePicker = false },
+            onConfirm = { viewModel.setDate(it); showDatePicker = false },
+        )
     }
 }
 

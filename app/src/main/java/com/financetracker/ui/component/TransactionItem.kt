@@ -90,6 +90,9 @@ fun TransactionItem(
                     text = titleText,
                     style = MaterialTheme.typography.bodyLarge,
                 )
+                if (transaction.type == TransactionType.EXPENSE && transaction.reimbursable) {
+                    Text(if (transaction.reimbursed) "已报销" else "待报销", style = MaterialTheme.typography.labelSmall, color = if (transaction.reimbursed) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary)
+                }
                 Spacer(modifier = Modifier.height(2.dp))
 
                 // Merchant (if exists)

@@ -84,12 +84,12 @@ class AccountingStorageTest {
             }
             context.getDatabasePath(name).parentFile!!.mkdirs()
             SQLiteDatabase.openOrCreateDatabase(context.getDatabasePath(name), null).use { old ->
-                statements.forEach(old::execSQL)
+                statements.map { it.replace(", `reimbursed` INTEGER NOT NULL DEFAULT 0", "") }.forEach(old::execSQL)
                 old.execSQL("INSERT INTO payment_accounts (id,name,type,isEnabled,color,balance) VALUES (1,'原有微信','wechat',1,'#07C160',880.0)")
                 old.execSQL("INSERT INTO transactions (id,amount,type,categoryId,accountId,transferToAccountId,merchant,note,reimbursable,date,source) VALUES (1,20.0,'EXPENSE',8,1,NULL,'原有账单','',0,1000,'manual')")
                 old.version = 6
             }
-            val migrated = Room.databaseBuilder(context, AppDatabase::class.java, name).addMigrations(AppDatabase.MIGRATION_6_7).build()
+            val migrated = Room.databaseBuilder(context, AppDatabase::class.java, name).addMigrations(AppDatabase.MIGRATION_6_7, AppDatabase.MIGRATION_7_8).build()
             try {
                 assertEquals("原有账单", migrated.transactionDao().getById(1)!!.merchant)
                 assertEquals(880.0, migrated.paymentAccountDao().getById(1)!!.balance, .001)

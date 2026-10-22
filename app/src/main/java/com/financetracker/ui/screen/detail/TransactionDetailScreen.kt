@@ -118,7 +118,7 @@ fun TransactionDetailScreen(
                         Text("删除", color = MaterialTheme.colorScheme.error)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White),
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
             )
         },
     ) { padding ->
@@ -149,6 +149,18 @@ fun TransactionDetailScreen(
                             style = MaterialTheme.typography.displayLarge,
                             color = color,
                         )
+                    }
+                }
+            }
+
+            if (t.type == TransactionType.EXPENSE && t.reimbursable) {
+                item {
+                    Card(shape = CardLarge, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(if (t.reimbursed) "已报销" else "待报销", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                            Text("这里只更新报销状态；实际到账请另记收入。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            TextButton(onClick = { viewModel.setReimbursed(!t.reimbursed) }) { Text(if (t.reimbursed) "改回待报销" else "标记已报销") }
+                        }
                     }
                 }
             }

@@ -65,6 +65,9 @@ class AddTransactionViewModel(
     private val _reimbursable = MutableStateFlow(false)
     val reimbursable: StateFlow<Boolean> = _reimbursable.asStateFlow()
 
+    private val _reimbursed = MutableStateFlow(false)
+    val reimbursed: StateFlow<Boolean> = _reimbursed.asStateFlow()
+
     private val _saved = MutableStateFlow(false)
     val saved: StateFlow<Boolean> = _saved.asStateFlow()
 
@@ -99,6 +102,7 @@ class AddTransactionViewModel(
             _note.value = t.note
             _date.value = t.date
             _reimbursable.value = t.reimbursable
+            _reimbursed.value = t.reimbursed
         }
     }
 
@@ -122,6 +126,7 @@ class AddTransactionViewModel(
     }
     fun setType(type: TransactionType) {
         _selectedType.value = type
+        if (type != TransactionType.EXPENSE) { _reimbursable.value = false; _reimbursed.value = false }
         _selectedCategoryId.value = -1L
     }
     fun setCategoryId(id: Long) { _selectedCategoryId.value = id }
@@ -129,7 +134,7 @@ class AddTransactionViewModel(
     fun setTransferToAccountId(id: Long) { _transferToAccountId.value = id }
     fun setMerchant(value: String) { _merchant.value = value }
     fun setNote(value: String) { _note.value = value }
-    fun setReimbursable(value: Boolean) { _reimbursable.value = value }
+    fun setReimbursable(value: Boolean) { _reimbursable.value = value; if (!value) _reimbursed.value = false }
     fun setDate(value: Long) { _date.value = value }
 
     fun onKeypadKey(key: KeypadKey) {
@@ -277,7 +282,8 @@ class AddTransactionViewModel(
             transferToAccountId = if (isTransfer) _transferToAccountId.value else null,
             merchant = _merchant.value,
             note = _note.value,
-            reimbursable = _reimbursable.value,
+            reimbursable = _selectedType.value == TransactionType.EXPENSE && _reimbursable.value,
+            reimbursed = _selectedType.value == TransactionType.EXPENSE && _reimbursable.value && _reimbursed.value,
             date = _date.value,
             source = "manual",
         )

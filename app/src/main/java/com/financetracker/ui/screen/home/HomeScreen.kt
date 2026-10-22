@@ -106,7 +106,8 @@ fun HomeScreen(
     val monthlyTransactions by viewModel.monthlyTransactions.collectAsState()
     val categories by viewModel.categories.collectAsState()
     val accounts by viewModel.accounts.collectAsState()
-    val deletedTransaction by viewModel.deletedTransaction.collectAsState()
+    val pendingUndo by viewModel.pendingUndo.collectAsState()
+    val operationError by viewModel.operationError.collectAsState()
 
     val categoryMap = remember(categories) { categories.associateBy { it.id } }
     val accountMap = remember(accounts) { accounts.associateBy { it.id } }
@@ -145,6 +146,7 @@ fun HomeScreen(
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 viewModel.refreshMonthRange()
+                viewModel.refreshUndo()
                 viewModel.loadFirstPage()  // 1.0.5 修复：返回首页时刷新分页列表
             }
         }
@@ -152,19 +154,27 @@ fun HomeScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    // Undo snackbar — auto-dismiss after ~4 seconds
-    LaunchedEffect(deletedTransaction?.id) {
-        val tx = deletedTransaction ?: return@LaunchedEffect
+    // Display only while the independently timed ViewModel opportunity remains valid.
+    LaunchedEffect(pendingUndo?.token) {
+        val opportunity = pendingUndo ?: return@LaunchedEffect
+        viewModel.refreshUndo()
+        if (viewModel.pendingUndo.value?.token != opportunity.token) return@LaunchedEffect
+        val tx = opportunity.value
         val result = snackbarHostState.showSnackbar(
             message = "已删除「${tx.merchant.ifBlank { tx.note.ifBlank { "记录" } }}」",
             actionLabel = "撤销",
-            duration = SnackbarDuration.Short,
+            duration = SnackbarDuration.Indefinite,
         )
-        if (result == SnackbarResult.ActionPerformed) {
-            viewModel.undoDelete()
-        } else {
-            viewModel.clearUndo()
-        }
+        if (result == SnackbarResult.ActionPerformed) viewModel.undoDelete(opportunity.token)
+        else viewModel.dismissUndo(opportunity.token)
+    }
+    DisposableEffect(snackbarHostState) {
+        onDispose { snackbarHostState.currentSnackbarData?.dismiss() }
+    }
+    LaunchedEffect(operationError) {
+        val message = operationError ?: return@LaunchedEffect
+        try { snackbarHostState.showSnackbar(message, duration = SnackbarDuration.Short) }
+        finally { viewModel.clearOperationError(message) }
     }
 
 
@@ -212,7 +222,7 @@ fun HomeScreen(
                             Text("把日子记好", style = MaterialTheme.typography.headlineMedium)
                             Text("每一笔，都有迹可循", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        IconButton(onClick = onNavigateToSearch) { Icon(Icons.Filled.Search, "搜索全部账单") }
+                        IconButton(onClick = onNavigateToSearch) { Icon(Icons.Filled.Search, "搜索与筛选账单") }
                     }
                 }
 

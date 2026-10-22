@@ -15,6 +15,7 @@ import com.financetracker.ui.screen.detail.TransactionDetailScreen
 import com.financetracker.ui.screen.home.HomeScreen
 import com.financetracker.ui.screen.search.SearchScreen
 import com.financetracker.ui.screen.settings.SettingsScreen
+import com.financetracker.ui.screen.settings.AccountingSettingsScreen
 import com.financetracker.ui.screen.statistics.StatisticsScreen
 
 private const val ANIM_DURATION = 200
@@ -43,6 +44,7 @@ fun NavGraph(navController: NavHostController, modifier: Modifier = Modifier) {
         composable(Screen.Search.route) {
             SearchScreen(
                 onTransactionClick = { id -> navController.navigate(Screen.detailRoute(id)) },
+                onNavigateBack = { navController.popBackStack() },
             )
         }
         composable(
@@ -50,7 +52,10 @@ fun NavGraph(navController: NavHostController, modifier: Modifier = Modifier) {
             enterTransition = { fadeIn(tween(ANIM_DURATION)) },
             exitTransition = { fadeOut(tween(ANIM_DURATION)) },
         ) {
-            SettingsScreen(onNavigateToAdd = { navController.navigate(Screen.addTransactionRoute()) })
+            SettingsScreen(onNavigateToSettings = { navController.navigate(Screen.Preferences.route) })
+        }
+        composable(Screen.Preferences.route) {
+            AccountingSettingsScreen(onNavigateBack = { navController.popBackStack() }, onNavigateToAdd = { navController.navigate(Screen.addTransactionRoute()) })
         }
         composable(
             route = Screen.AddTransaction.route,

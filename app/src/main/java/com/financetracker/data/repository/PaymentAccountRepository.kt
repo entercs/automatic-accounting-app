@@ -26,6 +26,8 @@ class PaymentAccountRepository(private val dao: PaymentAccountDao) {
 
     suspend fun updateNameAndColor(id: Long, name: String, color: String) = dao.updateNameAndColor(id, name, color)
 
+    suspend fun updateDetails(id: Long, name: String, color: String, balance: Double) = dao.updateDetails(id, name, color, balance)
+
     suspend fun create(name: String, type: String, color: String, balance: Double): Long =
         dao.insert(PaymentAccountEntity(name = name, type = type, color = color, balance = balance))
 

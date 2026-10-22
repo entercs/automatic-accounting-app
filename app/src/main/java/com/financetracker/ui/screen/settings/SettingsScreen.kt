@@ -1,470 +1,228 @@
 package com.financetracker.ui.screen.settings
 
 import android.content.Intent
-import android.provider.Settings
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.background
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.financetracker.di.AppModule
 import com.financetracker.domain.model.Banks
-import com.financetracker.notification.AccessibilityStateHolder
+import com.financetracker.domain.model.PaymentAccount
 import com.financetracker.ui.component.AccountLogo
-import com.financetracker.ui.component.BalanceKeypad
-import com.financetracker.ui.theme.AccountIconDisplay
+import com.financetracker.ui.component.AccountingHealthCard
+import com.financetracker.ui.component.BalanceCalculator
 import com.financetracker.ui.theme.CardLarge
 import com.financetracker.ui.theme.HeaderGradient
-import com.financetracker.ui.theme.softCardShadow
+import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
-fun SettingsScreen(onNavigateToAdd: () -> Unit = {}) {
-    val context = LocalContext.current
+private fun settingsModel(): SettingsViewModel {
+    val appContext = LocalContext.current.applicationContext
     val factory = remember {
-        SettingsViewModel.Factory(
-            AppModule.appPreferences,
-            AppModule.categoryRepository,
-            AppModule.paymentAccountRepository,
-            AppModule.transactionRepository,
-            context,
-        )
+        SettingsViewModel.Factory(AppModule.appPreferences, AppModule.categoryRepository,
+            AppModule.paymentAccountRepository, AppModule.transactionRepository, appContext)
     }
-    val viewModel: SettingsViewModel = viewModel(factory = factory)
-    val isAccessibilityEnabled by viewModel.isAccessibilityEnabled.collectAsState()
-    val accounts by viewModel.accounts.collectAsState()
-    val exportState by viewModel.exportState.collectAsState()
-    val feedback by viewModel.feedback.collectAsState()
-    val snackbarHostState = remember { SnackbarHostState() }
+    return viewModel(factory = factory)
+}
 
-    LaunchedEffect(feedback) {
-        feedback?.let {
-            snackbarHostState.showSnackbar(it)
-            viewModel.clearFeedback()
-        }
-    }
+@Composable
+fun SettingsScreen(onNavigateToSettings: () -> Unit = {}) {
+    val vm = settingsModel()
+    val accounts by vm.accounts.collectAsState()
+    val feedback by vm.feedback.collectAsState()
+    val snackbar = remember { SnackbarHostState() }
+    var editingId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var creating by rememberSaveable { mutableStateOf(false) }
+    var deleting by remember { mutableStateOf<PaymentAccount?>(null) }
+    LaunchedEffect(feedback) { feedback?.let { snackbar.showSnackbar(it); vm.clearFeedback() } }
 
-    // 修复 Bug 1: 每次从系统无障碍设置返回本页面时,主动重新查询无障碍状态
-    // (addAccessibilityStateChangeListener 在某些 ROM 上对单服务的开关不可靠)
-    val lifecycleOwner = LocalLifecycleOwner.current
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                AccessibilityStateHolder.refresh()
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
-
-    Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-    ) { padding ->
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp),
-        ) {
+    Scaffold(snackbarHost = { SnackbarHost(snackbar) }) { padding ->
+        LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             item {
-                Column(Modifier.padding(top = 8.dp, bottom = 20.dp)) {
-                    Text("我的钱包", style = MaterialTheme.typography.headlineMedium)
-                    Text("管理资产，让自动记账保持在线", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
+                Text("我的钱包", style = MaterialTheme.typography.headlineMedium)
+                Text("资产一眼看清，生活慢慢记好", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            item { com.financetracker.ui.component.AccountingHealthCard(onManualAdd = onNavigateToAdd); Spacer(Modifier.height(20.dp)) }
-            // 1.0.9 UI 规范: 净资产卡片 - 渐变头 + CardLarge(16dp) + softCardShadow
             item {
-                val totalAssets = accounts.sumOf { it.balance }
-                val assetsColor = if (totalAssets >= 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .softCardShadow()
-                        .clip(CardLarge)
-                        .background(HeaderGradient),
-                ) {
-                    Column(
-                        modifier = Modifier.fillMaxWidth().padding(24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                    ) {
-                        Text("净资产", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(
-                            String.format("%.2f", totalAssets),
-                            style = MaterialTheme.typography.displayLarge,
-                            color = assetsColor,
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.height(12.dp))
-            }
-
-            // ── Account settings ──
-            item {
-                Text("账户设置", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(bottom = 8.dp))
-                Card(
-                    modifier = Modifier.fillMaxWidth().softCardShadow(),
-                    shape = CardLarge,
-                ) {
-                    Column {
-                        accounts.forEachIndexed { i, acc ->
-                            val balColor = try {
-                                Color(android.graphics.Color.parseColor(acc.color))
-                            } catch (_: Exception) { Color.Gray }
-                            var showDialog by remember { mutableStateOf(false) }
-                            var editText by remember { mutableStateOf(String.format("%.2f", acc.balance)) }
-                            var showBankPicker by remember { mutableStateOf(false) }
-
-                            var showDeleteConfirm by remember { mutableStateOf(false) }
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth()
-                                    .clickable {
-                                        editText = String.format("%.2f", acc.balance)
-                                        showDialog = true
-                                    }
-                                    .padding(start = 16.dp, end = 4.dp, top = 12.dp, bottom = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                AccountIconDisplay(type = acc.type, accountName = acc.name, size = 28.dp)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(acc.name, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-                                Text(
-                                    String.format("%.2f", acc.balance),
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = if (acc.balance >= 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
-                                )
-                            }
-
-                            if (showDeleteConfirm) {
-                                AlertDialog(
-                                    onDismissRequest = { showDeleteConfirm = false },
-                                    title = { Text("删除账户") },
-                                    text = { Text("确定要删除「${acc.name}」吗？\n\n如有交易记录将无法删除。") },
-                                    confirmButton = {
-                                        TextButton(onClick = {
-                                            viewModel.deleteAccount(acc)
-                                            showDeleteConfirm = false
-                                        }) {
-                                            Text("删除", color = MaterialTheme.colorScheme.error)
-                                        }
-                                    },
-                                    dismissButton = {
-                                        TextButton(onClick = { showDeleteConfirm = false }) { Text("取消") }
-                                    },
-                                )
-                            }
-
-                            if (showDialog) {
-                                var tempBalance by remember(acc.id) { mutableStateOf(String.format(java.util.Locale.US, "%.2f", acc.balance)) }
-                                var balanceEdited by remember(acc.id) { mutableStateOf(false) }
-                                AlertDialog(
-                                    onDismissRequest = { showDialog = false },
-                                    title = {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Text("编辑 ${acc.name}", modifier = Modifier.weight(1f))
-                                            TextButton(onClick = {
-                                                showDialog = false
-                                                showDeleteConfirm = true
-                                            }) {
-                                                Text("删除账户", color = MaterialTheme.colorScheme.error)
-                                            }
-                                        }
-                                    },
-                                    text = {
-                                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                            // Balance display
-                                            Card(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                                            ) {
-                                                Column(
-                                                    modifier = Modifier.padding(16.dp),
-                                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                                ) {
-                                                    Text(
-                                                        tempBalance.ifEmpty { "0" },
-                                                        style = MaterialTheme.typography.displayLarge,
-                                                    )
-                                                }
-                                            }
-                                            // Keypad
-                                            BalanceKeypad(
-                                                onKey = { key ->
-                                                    if (!balanceEdited) { tempBalance = ""; balanceEdited = true }
-                                                    if (key == "." && tempBalance.contains(".")) return@BalanceKeypad
-                                                    if (tempBalance == "0" && key != ".") {
-                                                        tempBalance = key
-                                                    } else {
-                                                        tempBalance += key
-                                                    }
-                                                },
-                                                onBackspace = {
-                                                    tempBalance = if (tempBalance.length > 1) tempBalance.dropLast(1) else ""
-                                                },
-                                                onDone = {
-                                                    tempBalance.toDoubleOrNull()?.let { viewModel.setBalance(acc.id, it) }
-                                                    showDialog = false
-                                                },
-                                            )
-                                        }
-                                    },
-                                    confirmButton = {},
-                                    dismissButton = {
-                                        TextButton(onClick = { showDialog = false }) { Text("取消") }
-                                    },
-                                )
-                            }
-
-                            if (showBankPicker) {
-                                val banks = Banks.all
-                                AlertDialog(
-                                    onDismissRequest = { showBankPicker = false },
-                                    title = { Text("选择银行") },
-                                    text = {
-                                        LazyColumn {
-                                            items(banks) { bank ->
-                                                Row(
-                                                    modifier = Modifier.fillMaxWidth().clickable {
-                                                        viewModel.setBalance(acc.id, acc.balance) // keep balance
-                                                        viewModel.updateAccountName(acc.id, bank.name, bank.colorHex)
-                                                        showBankPicker = false
-                                                    }.padding(8.dp),
-                                                    verticalAlignment = Alignment.CenterVertically,
-                                                ) {
-                                                    com.financetracker.ui.component.AccountLogo(type = "bank", accountName = bank.name, size = 28.dp)
-                                                    Spacer(modifier = Modifier.width(12.dp))
-                                                    Text(bank.name, style = MaterialTheme.typography.bodyLarge)
-                                                }
-                                            }
-                                        }
-                                    },
-                                    confirmButton = {},
-                                    dismissButton = {
-                                        TextButton(onClick = { showBankPicker = false }) { Text("取消") }
-                                    },
-                                )
-                            }
-
-                            if (i < accounts.size - 1) HorizontalDivider()
-                        }
-                        // Add account button
-                        var showCreate by remember { mutableStateOf(false) }
-                        var createType by remember { mutableStateOf("bank") }
-                        var createName by remember { mutableStateOf("") }
-                        var createColor by remember { mutableStateOf("#F5A623") }
-
-                        TextButton(
-                            onClick = { showCreate = true; createName = "" },
-                            modifier = Modifier.fillMaxWidth().padding(4.dp),
-                        ) {
-                            Text("+ 添加账户")
-                        }
-
-                        if (showCreate) {
-                            var tempBalance by remember { mutableStateOf("") }
-                            AlertDialog(
-                                onDismissRequest = { showCreate = false },
-                                title = { Text("添加账户") },
-                                text = {
-                                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                        // Type selector
-                                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                            listOf("wechat" to "微信", "alipay" to "支付宝", "jd" to "京东", "bank" to "银行卡").forEach { (t, l) ->
-                                                val sel = createType == t
-                                                TextButton(onClick = {
-                                                    createType = t
-                                                    createName = if (t == "bank") "" else l
-                                                    createColor = if (t == "wechat") "#07C160" else if (t == "alipay") "#1677FF" else if (t == "jd") "#E3312C" else "#F5A623"
-                                                }) {
-                                                    Text(l, color = if (sel) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface, fontWeight = if (sel) FontWeight.SemiBold else FontWeight.Normal)
-                                                }
-                                            }
-                                        }
-                                        // Bank picker or name input
-                                        if (createType == "bank") {
-                                            var showBankList by remember { mutableStateOf(false) }
-                                            TextButton(onClick = { showBankList = true }) {
-                                                Text(if (createName.isBlank()) "选择银行…" else createName)
-                                            }
-                                            if (showBankList) {
-                                                AlertDialog(
-                                                    onDismissRequest = { showBankList = false },
-                                                    title = { Text("选择银行") },
-                                                    text = {
-                                                        LazyColumn {
-                                                            items(Banks.all) { bank ->
-                                                                Row(
-                                                                    modifier = Modifier.fillMaxWidth().clickable {
-                                                                        createName = bank.name; createColor = bank.colorHex; showBankList = false
-                                                                    }.padding(8.dp),
-                                                                    verticalAlignment = Alignment.CenterVertically,
-                                                                ) {
-                                                                    AccountLogo(type = "bank", accountName = bank.name, size = 24.dp)
-                                                                    Spacer(modifier = Modifier.width(12.dp))
-                                                                    Text(bank.name)
-                                                                }
-                                                            }
-                                                        }
-                                                    },
-                                                    confirmButton = {},
-                                                    dismissButton = { TextButton(onClick = { showBankList = false }) { Text("取消") } },
-                                                )
-                                            }
-                                        } else {
-                                            OutlinedTextField(value = createName, onValueChange = { createName = it }, label = { Text("名称") }, singleLine = true)
-                                        }
-                                        // Balance display
-                                        Card(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                                        ) {
-                                            Column(
-                                                modifier = Modifier.padding(16.dp),
-                                                horizontalAlignment = Alignment.CenterHorizontally,
-                                            ) {
-                                                Text(
-                                                    tempBalance.ifEmpty { "0" },
-                                                    style = MaterialTheme.typography.displayLarge,
-                                                )
-                                            }
-                                        }
-                                        // Keypad
-                                        BalanceKeypad(
-                                            onKey = { key ->
-                                                if (key == "." && tempBalance.contains(".")) return@BalanceKeypad
-                                                if (tempBalance == "0" && key != ".") {
-                                                    tempBalance = key
-                                                } else {
-                                                    tempBalance += key
-                                                }
-                                            },
-                                            onBackspace = {
-                                                tempBalance = if (tempBalance.length > 1) tempBalance.dropLast(1) else ""
-                                            },
-                                            onDone = {},
-                                        )
-                                    }
-                                },
-                                confirmButton = {
-                                    TextButton(onClick = {
-                                        val bal = tempBalance.toDoubleOrNull() ?: 0.0
-                                        val name = createName.ifBlank { if (createType == "bank") "银行卡" else when (createType) { "wechat" -> "微信"; "alipay" -> "支付宝"; "jd" -> "京东"; else -> "其他" } }
-                                        viewModel.createAccount(name, createType, createColor, bal)
-                                        showCreate = false
-                                    }) { Text("创建") }
-                                },
-                                dismissButton = { TextButton(onClick = { showCreate = false }) { Text("取消") } },
-                            )
-                        }
+                val net = accounts.sumOf { it.balance }
+                val assets = accounts.sumOf { it.balance.coerceAtLeast(0.0) }
+                val liabilities = accounts.filter { it.balance < 0 }.sumOf { -it.balance }
+                Column(Modifier.fillMaxWidth().clip(CardLarge).background(HeaderGradient).padding(24.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("净资产", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("¥ ${money(net)}", style = MaterialTheme.typography.displayLarge, color = if (net >= 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
+                    Text("${accounts.size} 个账户的当前余额", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    HorizontalDivider(Modifier.padding(vertical = 6.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        AssetAmount("总资产", assets, Modifier.weight(1f))
+                        AssetAmount("负债", liabilities, Modifier.weight(1f))
                     }
                 }
             }
-
-            // Export CSV
             item {
-                TextButton(onClick = { viewModel.exportCsv(context) }) {
-                    Text("导出 CSV")
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text("账户", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+                    TextButton(onClick = { creating = true }) { Text("＋ 添加账户") }
                 }
-                when (val state = exportState) {
-                    is SettingsViewModel.ExportState.Exporting -> {
-                        Text("正在导出...", modifier = Modifier.padding(horizontal = 8.dp), fontSize = 12.sp)
-                    }
-                    is SettingsViewModel.ExportState.Success -> {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("导出成功", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            TextButton(onClick = { viewModel.clearExportState() }) { Text("关闭", fontSize = 12.sp) }
-                            TextButton(onClick = {
-                                val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                                    type = "text/csv"
-                                    putExtra(Intent.EXTRA_STREAM, state.uri)
-                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            item {
+                Card(shape = CardLarge, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                    Column(Modifier.fillMaxWidth()) {
+                        if (accounts.isEmpty()) Text("还没有账户，点击上方添加。", Modifier.padding(20.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        accounts.forEachIndexed { index, account ->
+                            key(account.id) {
+                                Row(Modifier.fillMaxWidth().clickable { editingId = account.id }.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    AccountLogo(account.type, account.name, size = 32.dp)
+                                    Spacer(Modifier.width(12.dp))
+                                    Text(account.name, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+                                    Text(money(account.balance), color = if (account.balance >= 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyLarge)
+                                    Spacer(Modifier.width(6.dp)); Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
-                                context.startActivity(Intent.createChooser(shareIntent, "分享 CSV"))
-                            }) { Text("分享", fontSize = 12.sp) }
+                                if (index < accounts.lastIndex) HorizontalDivider(Modifier.padding(horizontal = 20.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                            }
                         }
                     }
-                    is SettingsViewModel.ExportState.Error -> {
-                        Text("导出失败: ${state.message}", color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
-                    }
-                    else -> {}
                 }
             }
-
-            item { Spacer(modifier = Modifier.height(8.dp)) }
-
-            // Version
+            item { Text("余额调整不会生成收支账单；日常收支请使用“记一笔”。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             item {
-                Text(
-                    "记账助手 v${com.financetracker.BuildConfig.VERSION_NAME}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                )
+                Card(onClick = onNavigateToSettings, shape = CardLarge, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                    Row(Modifier.fillMaxWidth().padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Settings, null, tint = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text("设置", style = MaterialTheme.typography.titleMedium)
+                            Text("自动记账、屏幕白名单与数据导出", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null)
+                    }
+                }
             }
         }
+    }
+    val editing = accounts.firstOrNull { it.id == editingId }
+    if (creating || editing != null) AccountEditor(
+        account = editing,
+        onDismiss = { creating = false; editingId = null },
+        onSave = { name, type, color, balance ->
+            if (editing == null) vm.createAccount(name, type, color, balance)
+            else vm.updateAccount(editing.id, name, color, balance)
+            creating = false; editingId = null
+        },
+        onDelete = editing?.let { account -> { editingId = null; deleting = account } },
+    )
+    deleting?.let { account ->
+        AlertDialog(onDismissRequest = { deleting = null }, title = { Text("删除账户") }, text = { Text("确定删除「${account.name}」吗？已有交易记录的账户不能删除。") },
+            confirmButton = { TextButton(onClick = { vm.deleteAccount(account); deleting = null }) { Text("删除", color = MaterialTheme.colorScheme.error) } },
+            dismissButton = { TextButton(onClick = { deleting = null }) { Text("取消") } })
     }
 }
 
 @Composable
-private fun SettingsRow(label: String, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(label, modifier = Modifier.weight(1f))
+private fun AssetAmount(label: String, amount: Double, modifier: Modifier) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("¥ ${money(amount)}", style = MaterialTheme.typography.titleMedium)
     }
 }
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun AccountEditor(account: PaymentAccount?, onDismiss: () -> Unit, onSave: (String, String, String, Double) -> Unit, onDelete: (() -> Unit)?) {
+    var name by rememberSaveable(account?.id) { mutableStateOf(account?.name.orEmpty()) }
+    var type by rememberSaveable(account?.id) { mutableStateOf(account?.type ?: "bank") }
+    var color by rememberSaveable(account?.id) { mutableStateOf(account?.color ?: "#B98849") }
+    var showBanks by rememberSaveable { mutableStateOf(false) }
+    AlertDialog(onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(if (account == null) "添加账户" else "编辑账户", modifier = Modifier.weight(1f))
+                if (onDelete != null) TextButton(onClick = onDelete) { Text("删除", color = MaterialTheme.colorScheme.error) }
+            }
+        },
+        text = {
+            Column(Modifier.heightIn(max = 560.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (account == null) FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    listOf("bank" to "银行卡", "wechat" to "微信", "alipay" to "支付宝", "jd" to "京东", "meituan" to "美团").forEach { (value, label) ->
+                        FilterChip(selected = type == value, onClick = {
+                            type = value; name = if (value == "bank") "" else label
+                            color = com.financetracker.ui.theme.accountColorHex(value)
+                        }, label = { Text(label) })
+                    }
+                }
+                if (type == "bank") TextButton(onClick = { showBanks = true }) { Text("选择银行") }
+                OutlinedTextField(name, { name = it }, label = { Text("账户名称") }, placeholder = { Text(if (type == "bank") "例如：招商银行 1234" else "填写账户名称") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                BalanceCalculator(initialBalance = account?.balance ?: 0.0, doneLabel = if (account == null) "创建账户" else "保存账户", onDone = { balance ->
+                    val fallback = when (type) { "wechat" -> "微信"; "alipay" -> "支付宝"; "jd" -> "京东"; "meituan" -> "美团"; else -> "银行卡" }
+                    onSave(name.trim().ifBlank { fallback }, type, color, balance)
+                })
+            }
+        },
+        confirmButton = {}, dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+    )
+    if (showBanks) AlertDialog(onDismissRequest = { showBanks = false }, title = { Text("选择银行") }, text = {
+        LazyColumn(Modifier.heightIn(max = 350.dp)) {
+            items(Banks.all) { bank ->
+                Row(Modifier.fillMaxWidth().clickable { name = bank.name; color = bank.colorHex; showBanks = false }.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    AccountLogo("bank", bank.name, size = 28.dp); Spacer(Modifier.width(12.dp)); Text(bank.name)
+                }
+            }
+        }
+    }, confirmButton = { TextButton(onClick = { showBanks = false }) { Text("关闭") } })
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AccountingSettingsScreen(onNavigateBack: () -> Unit, onNavigateToAdd: () -> Unit) {
+    val vm = settingsModel()
+    val context = LocalContext.current
+    val export by vm.exportState.collectAsState()
+    Scaffold(topBar = {
+        TopAppBar(title = { Text("设置") }, navigationIcon = { IconButton(onClick = onNavigateBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回") } },
+            colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background))
+    }) { padding ->
+        LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+            item { AccountingHealthCard(onManualAdd = onNavigateToAdd) }
+            item {
+                Card(shape = CardLarge, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                    Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("数据导出", style = MaterialTheme.typography.titleLarge)
+                        Text("导出账单为 CSV，便于自行保存与整理。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        TextButton(onClick = { vm.exportCsv(context) }, enabled = export !is SettingsViewModel.ExportState.Exporting) { Text("导出 CSV") }
+                        when (val state = export) {
+                            SettingsViewModel.ExportState.Exporting -> LinearProgressIndicator(Modifier.fillMaxWidth())
+                            is SettingsViewModel.ExportState.Success -> Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("导出成功", modifier = Modifier.weight(1f))
+                                TextButton(onClick = { context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
+                                    type = "text/csv"; putExtra(Intent.EXTRA_STREAM, state.uri); addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                }, "分享 CSV")) }) { Text("分享") }
+                                TextButton(onClick = vm::clearExportState) { Text("关闭") }
+                            }
+                            is SettingsViewModel.ExportState.Error -> Text(state.message, color = MaterialTheme.colorScheme.error)
+                            else -> Unit
+                        }
+                    }
+                }
+            }
+            item { Text("记账助手 V${com.financetracker.BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        }
+    }
+}
+
+private fun money(value: Double) = String.format(Locale.CHINA, "%,.2f", value)

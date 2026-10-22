@@ -3,6 +3,7 @@ package com.financetracker.ui.screen.statistics
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -29,12 +30,18 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.financetracker.data.repository.StatisticsRepository
 import com.financetracker.di.AppModule
 import com.financetracker.domain.model.TransactionType
+import com.financetracker.ui.component.TrendChartScale
+import com.financetracker.ui.component.trendDayIndex
 import com.financetracker.ui.component.CategoryLogo
 import com.financetracker.ui.component.SegmentedTab
 import com.financetracker.ui.theme.*
@@ -130,7 +137,7 @@ fun StatisticsScreen(onTransactionClick: (Long) -> Unit = {}) {
                     item { ComparisonCard(label, total, previous, accent) }
                     item {
                         ReportCard {
-                            SectionHeading("${label}趋势", "点击曲线查看当天金额")
+                            SectionHeading("${label}趋势", "金额（元） · 点击或横向滑动查看当天金额")
                             TrendChart(daily, start, minOf(end, System.currentTimeMillis()), accent)
                         }
                     }
@@ -276,7 +283,7 @@ private fun CategoryDonut(summaries: List<StatisticsRepository.CategorySummary>,
 
 @Composable
 private fun TrendChart(data: List<StatisticsRepository.DailyTotal>, start: Long, end: Long, color: Color) {
-    if (data.isEmpty()) { EmptyReport("还没有趋势", "添加账单后，点击曲线即可查看每日金额"); return }
+    if (data.isEmpty()) { EmptyReport("还没有趋势", "添加账单后，点击或横向滑动曲线查看每日金额"); return }
     val days = remember(data, start, end) {
         val map = data.associate { it.dayStart to it.total }
         buildList {
@@ -286,26 +293,53 @@ private fun TrendChart(data: List<StatisticsRepository.DailyTotal>, start: Long,
     }
     if (days.isEmpty()) return
     var selected by remember(days) { mutableStateOf<Int?>(null) }
-    val peak = days.maxOf { it.second }.coerceAtLeast(1.0)
+    val peak = days.maxOf { it.second }
+    val scale = remember(peak) { TrendChartScale(peak) }
     val grid = MaterialTheme.colorScheme.outlineVariant
+    val textMeasurer = rememberTextMeasurer()
+    val labelStyle = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
+    val tickLabels = scale.ticks.map { textMeasurer.measure(scale.label(it), labelStyle) }
+    val gutter = tickLabels.maxOf { it.size.width }.toFloat() + with(LocalDensity.current) { 10.dp.toPx() }
     val point = selected?.let { days.getOrNull(it) }
-    Text(point?.let { "${SimpleDateFormat("M月d日", Locale.CHINA).format(Date(it.first))} · ¥ ${money(it.second)}" }
-        ?: "单日最高 ¥ ${money(days.maxOf { it.second })}", color = color, style = MaterialTheme.typography.bodyMedium)
-    Canvas(Modifier.fillMaxWidth().height(150.dp).semantics { contentDescription = "每日趋势，最高${money(peak)}元" }
-        .pointerInput(days) { detectTapGestures { selected = ((it.x / size.width) * (days.size - 1)).toInt().coerceIn(0, days.lastIndex) } }) {
+    val selectedText = point?.let { "${SimpleDateFormat("M月d日", Locale.CHINA).format(Date(it.first))} · ¥ ${money(it.second)}" }
+        ?: "单日最高 ¥ ${money(peak)}"
+    Text(selectedText, color = color, style = MaterialTheme.typography.bodyMedium)
+    Canvas(Modifier.fillMaxWidth().height(164.dp)
+        .semantics {
+            contentDescription = "每日金额趋势，点击或横向滑动查看"
+            stateDescription = selectedText
+        }
+        .pointerInput(days, gutter) {
+            detectTapGestures { selected = trendDayIndex(it.x - gutter, size.width - gutter, 8.dp.toPx(), days.size) }
+        }
+        .pointerInput(days, gutter) {
+            detectHorizontalDragGestures(
+                onDragStart = { selected = trendDayIndex(it.x - gutter, size.width - gutter, 8.dp.toPx(), days.size) },
+                onHorizontalDrag = { change, _ ->
+                    selected = trendDayIndex(change.position.x - gutter, size.width - gutter, 8.dp.toPx(), days.size)
+                    change.consume()
+                },
+            )
+        }) {
         val padding = 8.dp.toPx()
-        val w = size.width - padding * 2
-        val h = size.height - padding * 2
-        for (i in 0..3) drawLine(grid, Offset(padding, padding + h * i / 3), Offset(size.width - padding, padding + h * i / 3), 1.dp.toPx())
-        val points = days.mapIndexed { index, (_, amount) -> Offset(padding + w * index / (days.size - 1).coerceAtLeast(1), padding + h * (1 - (amount / peak).toFloat())) }
+        val top = maxOf(padding, tickLabels.maxOf { it.size.height } / 2f)
+        val w = (size.width - gutter - padding * 2).coerceAtLeast(0f)
+        val h = (size.height - top * 2).coerceAtLeast(0f)
+        scale.ticks.forEachIndexed { index, _ ->
+            val y = top + h * index / 4
+            drawLine(grid, Offset(gutter + padding, y), Offset(size.width - padding, y), 1.dp.toPx())
+            val label = tickLabels[index]
+            drawText(label, topLeft = Offset(gutter - 10.dp.toPx() - label.size.width, y - label.size.height / 2f))
+        }
+        val points = days.mapIndexed { index, (_, amount) -> Offset(gutter + padding + w * index / (days.size - 1).coerceAtLeast(1), top + h * (1 - (amount / scale.maximum).toFloat().coerceIn(0f, 1f))) }
         val path = Path().apply { points.forEachIndexed { i, p -> if (i == 0) moveTo(p.x, p.y) else lineTo(p.x, p.y) } }
-        val area = Path().apply { addPath(path); lineTo(points.last().x, size.height - padding); lineTo(points.first().x, size.height - padding); close() }
+        val area = Path().apply { addPath(path); lineTo(points.last().x, size.height - top); lineTo(points.first().x, size.height - top); close() }
         drawPath(area, Brush.verticalGradient(listOf(color.copy(alpha = .18f), color.copy(alpha = .01f))))
         drawPath(path, color, style = Stroke(2.5.dp.toPx(), cap = StrokeCap.Round))
         if (points.size == 1) drawCircle(color, 4.dp.toPx(), points.first())
-        selected?.let { points.getOrNull(it)?.let { p -> drawLine(color.copy(alpha = .3f), Offset(p.x, padding), Offset(p.x, size.height - padding), 1.dp.toPx()); drawCircle(color, 5.dp.toPx(), p) } }
+        selected?.let { points.getOrNull(it)?.let { p -> drawLine(color.copy(alpha = .3f), Offset(p.x, top), Offset(p.x, size.height - top), 1.dp.toPx()); drawCircle(color, 5.dp.toPx(), p) } }
     }
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+    Row(Modifier.fillMaxWidth().padding(start = with(LocalDensity.current) { gutter.toDp() } + 8.dp, end = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
         Text(SimpleDateFormat("M/d", Locale.CHINA).format(Date(start)), style = MaterialTheme.typography.bodySmall)
         Text(SimpleDateFormat("M/d", Locale.CHINA).format(Date(end)), style = MaterialTheme.typography.bodySmall)
     }

@@ -5,6 +5,8 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
+val appVersion = "1.2.3"
+
 android {
     namespace = "com.financetracker"
     compileSdk = 35
@@ -14,8 +16,8 @@ android {
         minSdk = 26
         targetSdk = 35
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        versionCode = 13
-        versionName = "1.2.0"
+        versionCode = 16
+        versionName = appVersion
     }
 
     buildTypes {
@@ -87,4 +89,14 @@ dependencies {
     // Debug
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
+}
+
+// Keep the user-facing package name stable across local builds.
+val packageLatestApk by tasks.registering(Copy::class) {
+    dependsOn("assembleDebug")
+    from(layout.buildDirectory.dir("outputs/apk/debug")) { include("*.apk"); rename { "V${appVersion}.apk" } }
+    into(rootProject.layout.projectDirectory.dir("artifacts/latest"))
+    doLast {
+        destinationDir.listFiles()?.filter { it.extension == "apk" && it.name != "V${appVersion}.apk" }?.forEach { it.delete() }
+    }
 }

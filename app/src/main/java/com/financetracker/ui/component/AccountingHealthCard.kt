@@ -92,6 +92,16 @@ fun AccountingHealthCard(onManualAdd: () -> Unit = {}) {
                 }
                 TextButton(onClick = { context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }) { Text("设置") }
             }
+            var showWhitelist by remember { mutableStateOf(false) }
+            TextButton(onClick = { showWhitelist = !showWhitelist }, contentPadding = PaddingValues(0.dp)) { Text(if (showWhitelist) "收起屏幕识别白名单" else "查看屏幕识别白名单") }
+            if (showWhitelist) {
+                Text(ScreenCapturePolicy.apps.joinToString("、") { it.label }, style = MaterialTheme.typography.bodyMedium)
+                Text("仅以上应用可读取支付页面。银行 App 不在屏幕白名单内，银行卡动账仍通过通知读取处理。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Text("部分银行会检测无障碍服务是否开启，即使不读取银行页面也可能拦截。遇到此类提示，请关闭屏幕识别；通知读取仍可使用。关闭后需到系统设置手动重新开启。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (accessibilityConnected) OutlinedButton(onClick = {
+                if (!FinanceNotificationService.disableScreenRecognition()) context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+            }) { Text("关闭屏幕识别") }
             Text("没有通知、通知隐藏金额或支付页面无法读取时，仍需手动补记。银行短信暂不读取。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (!resultNotificationsEnabled && android.os.Build.VERSION.SDK_INT >= 33) TextButton(onClick = { permission.launch(android.Manifest.permission.POST_NOTIFICATIONS) }, contentPadding = PaddingValues(0.dp)) { Text("开启记账结果提醒") }
             TextButton(onClick = { context.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) }, contentPadding = PaddingValues(0.dp)) {

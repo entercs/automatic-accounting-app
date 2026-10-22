@@ -31,6 +31,8 @@ data class DailyGroup(
 
 fun groupTransactionsByDay(transactions: List<Transaction>): List<DailyGroup> {
     val dayFormat = SimpleDateFormat("M月d日", Locale.CHINA)
+    val currentYear = Calendar.getInstance().get(Calendar.YEAR)
+    val yearFormat = SimpleDateFormat("yyyy年M月d日", Locale.CHINA)
     val cal = Calendar.getInstance()
 
     val grouped = transactions.groupBy { tx ->
@@ -48,7 +50,8 @@ fun groupTransactionsByDay(transactions: List<Transaction>): List<DailyGroup> {
             1 -> "周日"; 2 -> "周一"; 3 -> "周二"; 4 -> "周三"
             5 -> "周四"; 6 -> "周五"; 7 -> "周六"; else -> ""
         }
-        val label = "${dayFormat.format(Date(date))} $dayOfWeek"
+        val formatter = if (cal.get(Calendar.YEAR) == currentYear) dayFormat else yearFormat
+        val label = "${formatter.format(Date(date))} $dayOfWeek"
         DailyGroup(
             dateLabel = label,
             transactions = txs.sortedByDescending { it.date },

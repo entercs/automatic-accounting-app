@@ -77,6 +77,15 @@ class TransactionDetailViewModel(
         }
     }
 
+    fun setReimbursed(completed: Boolean) {
+        val t = _transaction.value ?: return
+        if (t.type != TransactionType.EXPENSE || !t.reimbursable) return
+        viewModelScope.launch {
+            transactionRepo.setReimbursed(t.id, completed)
+            _transaction.value = transactionRepo.getById(t.id)
+        }
+    }
+
     fun delete() {
         val t = _transaction.value ?: return
         viewModelScope.launch {

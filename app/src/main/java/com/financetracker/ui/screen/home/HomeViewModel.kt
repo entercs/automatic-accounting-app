@@ -9,6 +9,11 @@ import com.financetracker.data.repository.TransactionRepository
 import com.financetracker.domain.model.Category
 import com.financetracker.domain.model.PaymentAccount
 import com.financetracker.domain.model.Transaction
+import android.os.SystemClock
+import com.financetracker.domain.undo.UndoWindow
+import com.financetracker.domain.undo.UndoOpportunity
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,6 +31,7 @@ class HomeViewModel(
     private val transactionRepo: TransactionRepository,
     categoryRepo: CategoryRepository,
     accountRepo: PaymentAccountRepository,
+    private val undoDurationMillis: Long = 4_000L,
 ) : ViewModel() {
 
     companion object {
@@ -130,32 +136,59 @@ class HomeViewModel(
         }
     }
 
-    // ====== 删除/撤销 ======
-    private val _deletedTransaction = MutableStateFlow<Transaction?>(null)
-    val deletedTransaction: StateFlow<Transaction?> = _deletedTransaction.asStateFlow()
+    // The ViewModel owns expiry, so navigating away cannot restart the snackbar's undo window.
+    private val undoWindow = UndoWindow<Transaction>(undoDurationMillis, SystemClock::elapsedRealtime)
+    private val _pendingUndo = MutableStateFlow<UndoOpportunity<Transaction>?>(null)
+    val pendingUndo: StateFlow<UndoOpportunity<Transaction>?> = _pendingUndo.asStateFlow()
+    private var undoExpiryJob: Job? = null
+    private val deletingIds = mutableSetOf<Long>()
+    private val _operationError = MutableStateFlow<String?>(null)
+    val operationError: StateFlow<String?> = _operationError.asStateFlow()
 
     fun deleteTransaction(transaction: Transaction) {
+        if (!deletingIds.add(transaction.id)) return
         viewModelScope.launch {
-            transactionRepo.delete(transaction)
-            _deletedTransaction.value = transaction
-            // 1.0.9 修复: 删除后 Flow 自动更新,但 loadFirstPage() 重置到首屏 20 条
-            loadFirstPage()
+            try {
+                val stored = transactionRepo.getById(transaction.id) ?: return@launch
+                transactionRepo.delete(stored)
+                val opportunity = undoWindow.offer(stored)
+                _pendingUndo.value = opportunity
+                undoExpiryJob?.cancel()
+                undoExpiryJob = viewModelScope.launch {
+                    delay(undoDurationMillis)
+                    refreshUndo()
+                }
+                loadFirstPage()
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { _operationError.value = "删除失败，请重试" }
+            finally { deletingIds.remove(transaction.id) }
         }
     }
 
-    fun undoDelete() {
-        val transaction = _deletedTransaction.value ?: return
+    /** Also called on resume, to account for device sleep or a temporarily frozen process. */
+    fun refreshUndo() { _pendingUndo.value = undoWindow.peek() }
+
+    fun undoDelete(token: Long) {
+        // Consume synchronously before launching IO: double taps and stale snackbars cannot restore twice.
+        val transaction = undoWindow.consume(token)
+        refreshUndo()
+        if (transaction == null) return
+        undoExpiryJob?.cancel()
         viewModelScope.launch {
-            transactionRepo.add(transaction.copy(id = 0))
-            _deletedTransaction.value = null
-            // 1.0.9 修复: 同上
-            loadFirstPage()
+            try {
+                transactionRepo.add(transaction)
+                loadFirstPage()
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { _operationError.value = "撤销失败，请核对账单并手动补记" }
         }
     }
 
-    fun clearUndo() {
-        _deletedTransaction.value = null
+    fun dismissUndo(token: Long) {
+        if (undoWindow.dismiss(token)) undoExpiryJob?.cancel()
+        refreshUndo()
     }
+
+    fun clearOperationError(message: String) { if (_operationError.value == message) _operationError.value = null }
 
     class Factory(
         private val transactionRepo: TransactionRepository,

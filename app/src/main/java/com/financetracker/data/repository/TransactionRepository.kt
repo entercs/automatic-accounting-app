@@ -33,6 +33,11 @@ class TransactionRepository(
     fun search(query: String): Flow<List<Transaction>> =
         dao.search(query).mapToDomain()
 
+    fun filter(query: String, categoryIds: Set<Long>, reimbursement: com.financetracker.domain.model.ReimbursementFilter, paymentTypes: Set<String> = emptySet()): Flow<List<Transaction>> =
+        dao.filter(query.trim(), categoryIds.isNotEmpty(), categoryIds.toList(), reimbursement.name, paymentTypes.isNotEmpty(), paymentTypes.toList()).mapToDomain()
+
+    suspend fun setReimbursed(id: Long, completed: Boolean) = dao.setReimbursed(id, completed)
+
     suspend fun getById(id: Long): Transaction? =
         dao.getById(id)?.toDomain()
 
@@ -108,12 +113,12 @@ private fun TransactionEntity.toDomain() = Transaction(
     id = id, amount = amount, type = TransactionType.valueOf(type),
     categoryId = categoryId, accountId = accountId,
     transferToAccountId = transferToAccountId,
-    merchant = merchant, note = note, reimbursable = reimbursable, date = date, source = source,
+    merchant = merchant, note = note, reimbursable = reimbursable, reimbursed = reimbursed, date = date, source = source,
 )
 
 private fun Transaction.toEntity() = TransactionEntity(
     id = id, amount = amount, type = type.name,
     categoryId = categoryId, accountId = accountId,
     transferToAccountId = transferToAccountId,
-    merchant = merchant, note = note, reimbursable = reimbursable, date = date, source = source,
+    merchant = merchant, note = note, reimbursable = reimbursable, reimbursed = reimbursed, date = date, source = source,
 )
