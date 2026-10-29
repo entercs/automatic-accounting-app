@@ -5,7 +5,7 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
-val appVersion = "1.2.3"
+val appVersion = "1.4.0"
 
 android {
     namespace = "com.financetracker"
@@ -16,7 +16,7 @@ android {
         minSdk = 26
         targetSdk = 35
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        versionCode = 16
+        versionCode = 19
         versionName = appVersion
     }
 

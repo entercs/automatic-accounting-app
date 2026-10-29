@@ -8,7 +8,6 @@ import com.financetracker.data.repository.PaymentAccountRepository
 import com.financetracker.data.repository.TransactionRepository
 import com.financetracker.domain.model.ParsedNotification
 import com.financetracker.domain.model.Transaction
-import com.financetracker.notification.classifier.AutoClassifier
 import kotlinx.coroutines.flow.first
 
 /** Event receipt, ledger row and balance effect commit or roll back together. */
@@ -27,8 +26,9 @@ class PaymentRecorder(private val db: AppDatabase) {
         if (!account.isEnabled) return@withTransaction "待补记：账户已停用"
         TransactionRepository(db.transactionDao(), db.paymentAccountDao()).add(Transaction(
             amount = value.amount, type = value.transactionType,
-            categoryId = AutoClassifier().classify(value.merchant, value.transactionType),
+            categoryId = CategoryRepository(db.categoryDao()).automaticCategoryId(value.transactionType),
             accountId = account.id, merchant = value.merchant, date = value.payTime, source = "notification",
+            note = value.paymentMethod?.let { "付款方式：$it" }.orEmpty(),
         ))
         db.accountingReceiptDao().insert(AccountingReceipt(eventId, now))
         db.accountingReceiptDao().prune(now - 7 * 86_400_000L)

@@ -27,6 +27,7 @@ import com.financetracker.di.AppModule
 import com.financetracker.domain.model.Banks
 import com.financetracker.domain.model.PaymentAccount
 import com.financetracker.ui.component.AccountLogo
+import com.financetracker.ui.component.LauncherIconCard
 import com.financetracker.ui.component.AccountingHealthCard
 import com.financetracker.ui.component.BalanceCalculator
 import com.financetracker.ui.theme.CardLarge
@@ -189,7 +190,7 @@ private fun AccountEditor(account: PaymentAccount?, onDismiss: () -> Unit, onSav
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AccountingSettingsScreen(onNavigateBack: () -> Unit, onNavigateToAdd: () -> Unit) {
+fun AccountingSettingsScreen(onNavigateBack: () -> Unit, onOpenRecognition: () -> Unit) {
     val vm = settingsModel()
     val context = LocalContext.current
     val export by vm.exportState.collectAsState()
@@ -198,7 +199,8 @@ fun AccountingSettingsScreen(onNavigateBack: () -> Unit, onNavigateToAdd: () -> 
             colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background))
     }) { padding ->
         LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-            item { AccountingHealthCard(onManualAdd = onNavigateToAdd) }
+            item { LauncherIconCard() }
+            item { AccountingHealthCard(onOpenRecords = onOpenRecognition) }
             item {
                 Card(shape = CardLarge, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                     Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {

@@ -17,6 +17,7 @@ import com.financetracker.ui.screen.search.SearchScreen
 import com.financetracker.ui.screen.settings.SettingsScreen
 import com.financetracker.ui.screen.settings.AccountingSettingsScreen
 import com.financetracker.ui.screen.statistics.StatisticsScreen
+import com.financetracker.ui.screen.recognition.*
 
 private const val ANIM_DURATION = 200
 
@@ -55,13 +56,30 @@ fun NavGraph(navController: NavHostController, modifier: Modifier = Modifier) {
             SettingsScreen(onNavigateToSettings = { navController.navigate(Screen.Preferences.route) })
         }
         composable(Screen.Preferences.route) {
-            AccountingSettingsScreen(onNavigateBack = { navController.popBackStack() }, onNavigateToAdd = { navController.navigate(Screen.addTransactionRoute()) })
+            AccountingSettingsScreen(onNavigateBack = { navController.popBackStack() }, onOpenRecognition = { navController.navigate(Screen.Recognition.route) })
+        }
+        composable(Screen.Recognition.route) {
+            RecognitionRecordsScreen(
+                onBack = { navController.popBackStack() },
+                onDetail = { navController.navigate("recognition/$it") },
+                onTest = { navController.navigate("notification_test") },
+            )
+        }
+        composable(Screen.RecognitionDetail.route, arguments = listOf(navArgument("recordId") { type = NavType.StringType })) { entry ->
+            RecognitionDetailScreen(entry.arguments?.getString("recordId").orEmpty(),
+                onBack = { navController.popBackStack() },
+                onTest = { navController.navigate("notification_test?sampleId=$it") },
+                onManualAdd = { navController.navigate(Screen.addTransactionRoute(sampleId = it)) })
+        }
+        composable(Screen.NotificationTest.route, arguments = listOf(navArgument("sampleId") { type = NavType.StringType; defaultValue = "" })) { entry ->
+            NotificationTestScreen(entry.arguments?.getString("sampleId").orEmpty(), onBack = { navController.popBackStack() })
         }
         composable(
             route = Screen.AddTransaction.route,
             arguments = listOf(
                 navArgument("editId") { type = NavType.LongType; defaultValue = -1L },
                 navArgument("refundId") { type = NavType.LongType; defaultValue = -1L },
+                navArgument("sampleId") { type = NavType.StringType; defaultValue = "" },
             ),
             enterTransition = { fadeIn(tween(ANIM_DURATION)) },
             exitTransition = { fadeOut(tween(ANIM_DURATION)) },
@@ -71,6 +89,7 @@ fun NavGraph(navController: NavHostController, modifier: Modifier = Modifier) {
             val editId = backStackEntry.arguments?.getLong("editId") ?: -1L
             val refundId = backStackEntry.arguments?.getLong("refundId") ?: -1L
             AddTransactionScreen(
+                sampleId = backStackEntry.arguments?.getString("sampleId")?.takeIf { it.isNotBlank() },
                 editTransactionId = if (editId > 0) editId else null,
                 refundTransactionId = if (refundId > 0) refundId else null,
                 onNavigateBack = { navController.popBackStack() },

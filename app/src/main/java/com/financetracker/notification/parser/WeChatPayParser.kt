@@ -53,7 +53,8 @@ class WeChatPayParser : NotificationParser {
         val type = if (isIncome) TransactionType.INCOME else TransactionType.EXPENSE
 
         // 提取商户: 红包通知的发送人来自"来自XX的红包",其他用原有 pattern
-        val merchant = merchantRedPacketPattern.find(combined)?.groupValues?.get(1)?.trim()
+        val merchant = MerchantText.extract(combined)
+            ?: merchantRedPacketPattern.find(combined)?.groupValues?.get(1)?.trim()
             ?: merchantPattern.find(combined)?.groupValues?.get(1)?.trim()
             ?: merchantPayPattern.find(combined)?.groupValues?.get(1)?.trim()
             ?: if (combined.contains("红包")) "微信红包"

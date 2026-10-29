@@ -82,6 +82,7 @@ class AddTransactionViewModel(
         viewModelScope.launch {
             val lastId = prefs.lastAccountId.first()
             val accs = accountRepo.getEnabled().first()
+            if (_selectedAccountId.value > 0) return@launch
             if (lastId > 0 && accs.any { it.id == lastId }) {
                 _selectedAccountId.value = lastId
             } else if (accs.isNotEmpty()) {
@@ -103,6 +104,26 @@ class AddTransactionViewModel(
             _date.value = t.date
             _reimbursable.value = t.reimbursable
             _reimbursed.value = t.reimbursed
+        }
+    }
+
+    fun loadRecognitionSample(id: String) {
+        val sample = com.financetracker.notification.NotificationLogger.getAll().find { it.id == id } ?: return
+        val value = com.financetracker.notification.parser.PaymentParsers.parse(sample.packageName, sample.title, sample.text)
+        _amount.value = (value?.amount ?: sample.parsedAmount)?.toBigDecimal()?.stripTrailingZeros()?.toPlainString().orEmpty()
+        _selectedType.value = value?.transactionType ?: sample.transactionType ?: TransactionType.EXPENSE
+        _merchant.value = value?.merchant ?: sample.merchant.orEmpty()
+        _date.value = sample.postedAt ?: sample.timestamp
+        _note.value = "识别补记：${sample.title}\n${sample.text.take(200)}"
+        viewModelScope.launch {
+            val appId = com.financetracker.notification.RecognitionApps.find(sample.packageName)?.id
+            val type = value?.accountType ?: when (appId) {
+                "wechat", "alipay", "jd" -> appId
+                "meituan", "takeout", "dianping" -> "meituan"
+                null -> null
+                else -> "bank"
+            }
+            accountRepo.getEnabled().first().singleOrNull { it.type == type }?.let { _selectedAccountId.value = it.id }
         }
     }
 

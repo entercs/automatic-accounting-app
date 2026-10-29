@@ -24,8 +24,6 @@ class AlipayParser : NotificationParser {
     private val amountRmbPattern = Regex("人民币\\s*(\\d+\\.?\\d*)")
     // 匹配 "你在某某有一笔" 格式
     private val merchantInlinePattern = Regex("你在(.+?)有一笔")
-    // 1.0.9 新增: 匹配 "你有一笔 X 元" 这种无 "在X" 前缀的场景(花呗/积分通知常见)
-    private val merchantNoPrefixPattern = Regex("你有一笔\\s*\\d+\\.?\\d*\\s*元")
     // 匹配 "收款方: xxx" 格式（兼容旧格式）
     private val merchantTagPattern = Regex("收款方[:：]\\s*(.+)")
     // 匹配 "向(.+?)付款" 或 "给(.+?)转账" 等
@@ -80,8 +78,9 @@ class AlipayParser : NotificationParser {
         val combined = "$title $text"
 
         // 标题整体若是"红包/优惠/额度"等纯营销类，跳过
-        if (combined.contains("红包失效") || combined.contains("红包即将失效") ||
-            combined.contains("提额") || combined.contains("额度提升")) {
+        val confirmedTransaction = title.trim() == "交易提醒" && AlipayEvidence.completed(text)
+        if (!confirmedTransaction && (combined.contains("红包失效") || combined.contains("红包即将失效") ||
+            combined.contains("提额") || combined.contains("额度提升"))) {
             return null
         }
 
@@ -117,25 +116,27 @@ class AlipayParser : NotificationParser {
         // 判断收入还是支出（1.0.7 修复：优先看明确的支出信号,避免"小荷包支付红包"等"红包"误判为收入）
         val isExpense = expenseKeywords.any { combined.contains(it) }
         val isIncome = Regex("退款成功|退款到账|退款已到账|收款成功|收款到账|转账到账|已入账").containsMatchIn(combined) || (!isExpense && incomeKeywords.any { combined.contains(it) })
-        val type = if (isIncome) TransactionType.INCOME else TransactionType.EXPENSE
+        val type = if (Regex("退款成功|退款到账|退款已到账|收款成功|收款到账|转账到账|已入账").containsMatchIn(combined)) TransactionType.INCOME
+            else AlipayEvidence.direction(text) ?: if (isIncome) TransactionType.INCOME else TransactionType.EXPENSE
 
         // 提取商户
-        // 1.0.9 修复: "你有一笔 X 元" 这种无 "在X" 前缀的场景,先记录再让 default 兜底
-        // 同时检查"花呗"等支付方式,让 merchant 显示"花呗"更准确
+        // Merchant and payment method are separate; missing merchant data never blocks a valid transaction.
         val inlineMerchant = merchantInlinePattern.find(combined)?.groupValues?.get(1)?.trim()
-        val noPrefixMatch = merchantNoPrefixPattern.containsMatchIn(combined)
         val tagMerchant = merchantTagPattern.find(combined)?.groupValues?.get(1)?.trim()
         val payMerchant = merchantPayPattern.find(combined)?.groupValues?.get(1)?.trim()
-        val paymentMethodMerchant = when {
-            noPrefixMatch && combined.contains("花呗") -> "花呗"
-            noPrefixMatch && combined.contains("余额宝") -> "余额宝"
+        val methodMatch = Regex("(?:使用|通过)(花呗|余额宝|银行卡|余额)(?:支付|付款)|(?:付款|支付)方式[：:\\s]*(花呗|余额宝|银行卡|余额)|(花呗|余额宝|银行卡|余额)(?:支付|付款)成功").find(text)
+        val explicitMethod = methodMatch?.groupValues?.drop(1)?.firstOrNull { it.isNotBlank() }
+        val paymentMethod = when {
+            explicitMethod == "余额" -> "支付宝余额"
+            explicitMethod != null -> explicitMethod
+            Regex("元(?:的)?(?:免密|自动扣款)|(?:使用|通过)(?:免密|自动扣款)").containsMatchIn(text) -> "免密 / 自动扣款"
             else -> null
         }
         val defaultMerchant = if (type == TransactionType.INCOME) "支付宝收入" else "支付宝"
-        val merchant = inlineMerchant
+        val merchant = MerchantText.extract(combined)
+            ?: inlineMerchant
             ?: tagMerchant
             ?: payMerchant
-            ?: paymentMethodMerchant
             ?: defaultMerchant
 
         return ParsedNotification(
@@ -144,6 +145,7 @@ class AlipayParser : NotificationParser {
             accountType = "alipay",
             transactionType = type,
             payTime = System.currentTimeMillis(),
+            paymentMethod = paymentMethod,
         )
     }
 }

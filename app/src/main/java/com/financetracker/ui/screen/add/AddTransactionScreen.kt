@@ -66,7 +66,7 @@ import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun AddTransactionScreen(editTransactionId: Long? = null, refundTransactionId: Long? = null, onNavigateBack: () -> Unit) {
+fun AddTransactionScreen(editTransactionId: Long? = null, refundTransactionId: Long? = null, sampleId: String? = null, onNavigateBack: () -> Unit) {
     val factory = remember {
         AddTransactionViewModel.Factory(
             AppModule.transactionRepository,
@@ -76,6 +76,8 @@ fun AddTransactionScreen(editTransactionId: Long? = null, refundTransactionId: L
         )
     }
     val viewModel: AddTransactionViewModel = viewModel(factory = factory)
+
+    LaunchedEffect(sampleId) { sampleId?.let { viewModel.loadRecognitionSample(it) } }
 
     LaunchedEffect(editTransactionId) {
         editTransactionId?.let { viewModel.loadTransaction(it) }

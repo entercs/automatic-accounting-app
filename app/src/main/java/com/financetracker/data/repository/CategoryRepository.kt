@@ -26,6 +26,8 @@ class CategoryRepository(private val dao: CategoryDao) {
 
     suspend fun count(): Int = dao.count()
 
+    suspend fun automaticCategoryId(type: TransactionType): Long = dao.automaticCategoryId(type.name)
+
     suspend fun seedIfEmpty() {
         if (dao.count() == 0) {
             listOf(
@@ -42,6 +44,8 @@ class CategoryRepository(private val dao: CategoryDao) {
                 CategoryEntity(11, "其他收入", "📊", "INCOME"),
             ).forEach { dao.insert(it) }
         }
+        automaticCategoryId(TransactionType.EXPENSE)
+        automaticCategoryId(TransactionType.INCOME)
     }
 }
 

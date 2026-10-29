@@ -25,6 +25,7 @@ private fun getBankLogoRes(name: String): Int = when {
 
 /** Returns drawable resource ID for a category by name, or null for emoji fallback */
 fun getCategoryLogoRes(categoryName: String): Int? = when {
+    categoryName == "自动记账" -> R.drawable.ic_cat_automatic
     "餐饮" in categoryName -> R.drawable.ic_cat_dining
     "购物" in categoryName -> R.drawable.ic_cat_shopping
     "交通" in categoryName -> R.drawable.ic_cat_transport

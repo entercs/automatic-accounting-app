@@ -111,7 +111,7 @@ class ScreenContentParser {
         val type = if (isIncome) TransactionType.INCOME else TransactionType.EXPENSE
 
         // Extract merchant — try known patterns
-        var merchant = ""
+        var merchant = com.financetracker.notification.parser.MerchantText.extract(combined).orEmpty()
         val merchantPatterns = listOf(
             Regex("收款方[:：]\\s*(.+)"),
             Regex("商户[:：]\\s*(.+)"),
@@ -123,6 +123,7 @@ class ScreenContentParser {
             Regex("向(.+?)(?:付款|支付|转账)"),
         )
         for (p in merchantPatterns) {
+            if (merchant.isNotBlank()) break
             val m = p.find(combined)?.groupValues?.get(1)?.trim()
             if (m != null && m.length in 2..20) {
                 merchant = m
@@ -167,7 +168,7 @@ class ScreenContentParser {
             else -> return null
         }
 
-        return ParsedNotification(amount, merchant, accountType, type, System.currentTimeMillis())
+        return ParsedNotification(amount, com.financetracker.notification.parser.MerchantText.clean(merchant), accountType, type, System.currentTimeMillis())
     }
 
     private fun collectTexts(node: AccessibilityNodeInfo, maxNodes: Int): List<String> {

@@ -34,6 +34,19 @@ class AccountingStorageTest {
         } finally { db.close() }
     }
 
+    @Test fun paymentMethodSurvivesAsNoteWithoutReplacingMerchantOrChangingAmount() = runBlocking {
+        val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).build()
+        try {
+            val value = payment().copy(merchant = "真实商户", paymentMethod = "花呗")
+            assertEquals("已记账", PaymentRecorder(db).record(value, "method-note", System.currentTimeMillis()))
+            val tx = db.transactionDao().getById(1)!!
+            assertEquals("真实商户", tx.merchant)
+            assertEquals("付款方式：花呗", tx.note)
+            assertEquals(20.0, tx.amount, .001)
+            assertEquals(-20.0, db.paymentAccountDao().getByType("wechat")!!.balance, .001)
+        } finally { db.close() }
+    }
+
     @Test fun dailyTotalsUseTheDevicesLocalMidnight() = runBlocking {
         val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).build()
         try {

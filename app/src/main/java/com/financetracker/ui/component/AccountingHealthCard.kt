@@ -34,13 +34,12 @@ import com.financetracker.domain.model.TransactionType
 import com.financetracker.ui.theme.CardLarge
 
 @Composable
-fun AccountingHealthCard(onManualAdd: () -> Unit = {}) {
+fun AccountingHealthCard(onOpenRecords: () -> Unit = {}) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val state by PaymentMonitor.status.collectAsState()
     val accessibilityAuthorized by AccessibilityStateHolder.isEnabled.collectAsState()
     val accessibilityConnected by AccessibilityStateHolder.isConnected.collectAsState()
-    var showDiagnostics by remember { mutableStateOf(false) }
     var resultNotificationsEnabled by remember { mutableStateOf(NotificationManagerCompat.from(context).areNotificationsEnabled()) }
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { resultNotificationsEnabled = it }
     var recoveryRequested by remember { mutableStateOf(false) }
@@ -61,7 +60,7 @@ fun AccountingHealthCard(onManualAdd: () -> Unit = {}) {
                 Icon(Icons.Default.Sensors, null, tint = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.width(10.dp))
                 Text("自动记账", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
-                SuggestionChip(onClick = { showDiagnostics = true }, label = { Text("识别记录") })
+                SuggestionChip(onClick = onOpenRecords, label = { Text("识别记录") })
             }
             Text("通知读取 · 主要通道", style = MaterialTheme.typography.bodyLarge)
             Text(when {
@@ -109,91 +108,4 @@ fun AccountingHealthCard(onManualAdd: () -> Unit = {}) {
             }
         }
     }
-    if (showDiagnostics) RecognitionDiagnostics(onDismiss = { showDiagnostics = false }, onManualAdd = onManualAdd)
-}
-
-@Composable
-private fun RecognitionDiagnostics(onDismiss: () -> Unit, onManualAdd: () -> Unit) {
-    val logs by NotificationLogger.logs.collectAsState()
-    val listState = rememberLazyListState()
-    val scope = rememberCoroutineScope()
-    val clipboard = LocalClipboardManager.current
-    var showOnlyPending by remember { mutableStateOf(true) }
-    var showTester by remember { mutableStateOf(false) }
-    var confirmClear by remember { mutableStateOf(false) }
-    var pkg by remember { mutableStateOf("com.tencent.mm") }
-    var title by remember { mutableStateOf("微信支付") }
-    var body by remember { mutableStateOf("") }
-    var result by remember { mutableStateOf<String?>(null) }
-    var copied by remember { mutableStateOf(false) }
-    val visible = logs.filter { !showOnlyPending || (it.outcome != "已记账" && it.outcome != "重复已跳过") }
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-            LazyColumn(state = listState, contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                item {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text("识别记录", style = MaterialTheme.typography.headlineSmall)
-                            Text("最近 100 条样本，仅保存在本机", style = MaterialTheme.typography.bodySmall)
-                        }
-                        IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, "关闭") }
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FilterChip(selected = showOnlyPending, onClick = { showOnlyPending = true }, label = { Text("待补充") })
-                        FilterChip(selected = !showOnlyPending, onClick = { showOnlyPending = false }, label = { Text("全部") })
-                        TextButton(onClick = { showTester = !showTester; result = null }) { Text("样本测试") }
-                    }
-                    Row {
-                        TextButton(enabled = logs.isNotEmpty(), onClick = {
-                            clipboard.setText(AnnotatedString(visible.joinToString("\n\n") { it.formatted })); copied = true
-                        }) { Text(if (copied) "已复制" else "复制当前记录") }
-                        TextButton(enabled = logs.isNotEmpty(), onClick = { confirmClear = true }) { Text("清空记录") }
-                    }
-                }
-                if (showTester) item {
-                    Card(shape = CardLarge) {
-                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("测试一条通知", style = MaterialTheme.typography.titleMedium)
-                            Text("只预览识别结果，不写入账本。修改内容后请重新测试。", style = MaterialTheme.typography.bodySmall)
-                            OutlinedTextField(pkg, { pkg = it; result = null }, label = { Text("来源应用包名") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                            OutlinedTextField(title, { title = it; result = null }, label = { Text("通知标题") }, modifier = Modifier.fillMaxWidth())
-                            OutlinedTextField(body, { body = it; result = null }, label = { Text("通知正文") }, minLines = 3, maxLines = 8, modifier = Modifier.fillMaxWidth())
-                            Button(enabled = body.isNotBlank(), onClick = {
-                                val parsed = PaymentParsers.parse(pkg.trim(), title, body)
-                                result = if (!PaymentParsers.supports(pkg.trim())) "暂未支持此来源，可复制样本供后续补充。"
-                                else parsed?.let { "识别为${if (it.transactionType == TransactionType.INCOME) "收入" else "支出"} ¥%.2f · ${it.merchant}".format(it.amount) }
-                                    ?: "暂未识别为已完成交易，请手动补记并保留样本。"
-                            }) { Text("测试识别") }
-                            result?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
-                        }
-                    }
-                }
-                if (visible.isEmpty()) item {
-                    Column(Modifier.fillMaxWidth().padding(vertical = 32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(Icons.AutoMirrored.Filled.ReceiptLong, null, Modifier.size(40.dp), tint = MaterialTheme.colorScheme.primary)
-                        Spacer(Modifier.height(12.dp))
-                        Text(if (showOnlyPending) "还没有待补充的样本" else "还没有识别记录", style = MaterialTheme.typography.titleMedium)
-                        Text("开启监听后，支持的支付应用发来新通知时会显示在这里。", style = MaterialTheme.typography.bodySmall)
-                    }
-                }
-                items(visible) { entry ->
-                    Card(shape = CardLarge) {
-                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text(entry.outcome, color = if (entry.outcome == "已记账") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error, fontWeight = FontWeight.SemiBold)
-                            Text(entry.formatted, style = MaterialTheme.typography.bodySmall)
-                            Row {
-                                TextButton(onClick = { clipboard.setText(AnnotatedString(entry.formatted)); copied = true }) { Text("复制样本") }
-                                if (entry.source != "屏幕补充") TextButton(onClick = { pkg = entry.packageName; title = entry.title; body = entry.text; result = null; showTester = true; scope.launch { listState.animateScrollToItem(0) } }) { Text("填入测试") }
-                                if (entry.outcome != "已记账" && entry.outcome != "重复已跳过") TextButton(onClick = { onDismiss(); onManualAdd() }) { Text("手动补记") }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-    if (confirmClear) AlertDialog(onDismissRequest = { confirmClear = false }, title = { Text("清空识别记录？") },
-        text = { Text("仅清空本机诊断样本，已保存的账单不受影响。") },
-        confirmButton = { TextButton(onClick = { NotificationLogger.clear(); confirmClear = false }) { Text("清空") } },
-        dismissButton = { TextButton(onClick = { confirmClear = false }) { Text("取消") } })
 }

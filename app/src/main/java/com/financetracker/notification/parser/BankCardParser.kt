@@ -79,7 +79,9 @@ class BankCardParser : NotificationParser {
         if (amount == null || amount == 0.0) return null
 
         // 判断收入还是支出
-        val isIncome = incomeKeywords.any { combined.contains(it) }
+        val confirmedExpense = Regex("(?:消费|支出|扣款)(?:成功|金额)?[：:\\s]*(?:人民币|RMB|CNY)?[¥￥\\s]*[0-9]").containsMatchIn(combined)
+        val isRefund = Regex("退款成功|退款到账|退款金额").containsMatchIn(combined)
+        val isIncome = isRefund || (!confirmedExpense && incomeKeywords.any { combined.contains(it) })
         val type = if (isIncome) TransactionType.INCOME else TransactionType.EXPENSE
 
         // 提取商户
@@ -87,7 +89,8 @@ class BankCardParser : NotificationParser {
         // 1.0.7 修复: 招行入账通知中 merchantAtPattern 无法匹配"尾号2741的招行一卡通入账"(没有"在"字),
         // 用 cmbAccountLabelPattern 提取尾号作为招行入账的兜底商户标签
         val cmbMatch = cmbAccountLabelPattern.find(combined)
-        val merchant = merchantColonPattern.find(combined)?.groupValues?.get(1)?.trim()
+        val merchant = MerchantText.extract(combined)
+            ?: merchantColonPattern.find(combined)?.groupValues?.get(1)?.trim()
             ?: merchantAtPattern.find(combined)?.groupValues?.get(1)?.trim()
             ?: if (cmbMatch != null && combined.contains("入账") && (title.contains("招商") || title.contains("招行"))) {
                 "${title}尾号${cmbMatch.groupValues[1]}"

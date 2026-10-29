@@ -14,16 +14,20 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
     data object Search : Screen("search", "搜索", Icons.Filled.Search)
     data object Settings : Screen("settings", "我的", Icons.Filled.Person)
     data object Preferences : Screen("preferences", "设置", Icons.Filled.Person)
-    data object AddTransaction : Screen("add_transaction?editId={editId}", "记账", Icons.Filled.AddCircle)
+    data object Recognition : Screen("recognition", "识别记录", Icons.Filled.Search)
+    data object RecognitionDetail : Screen("recognition/{recordId}", "识别详情", Icons.Filled.Search)
+    data object NotificationTest : Screen("notification_test?sampleId={sampleId}", "测试通知", Icons.Filled.Search)
+    data object AddTransaction : Screen("add_transaction?editId={editId}&refundId={refundId}&sampleId={sampleId}", "记账", Icons.Filled.AddCircle)
     data object TransactionDetail : Screen("transaction_detail/{transactionId}", "详情", Icons.Filled.Home)
 
     companion object {
         val bottomNavItems = listOf(Home, Statistics, Settings)
 
-        fun addTransactionRoute(editId: Long? = null, refundId: Long? = null): String {
+        fun addTransactionRoute(editId: Long? = null, refundId: Long? = null, sampleId: String? = null): String {
             val params = mutableListOf<String>()
             editId?.let { params.add("editId=$it") }
             refundId?.let { params.add("refundId=$it") }
+            sampleId?.let { params.add("sampleId=${android.net.Uri.encode(it)}") }
             return if (params.isEmpty()) "add_transaction" else "add_transaction?${params.joinToString("&")}"
         }
 
