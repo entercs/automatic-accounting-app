@@ -1,5 +1,6 @@
 package com.financetracker.ui.screen.recognition
 
+import com.financetracker.domain.calculator.Money
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -15,7 +16,6 @@ import androidx.compose.ui.unit.dp
 import com.financetracker.notification.*
 import com.financetracker.domain.model.TransactionType
 import com.financetracker.ui.theme.CardLarge
-import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -35,7 +35,7 @@ fun RecognitionDetailScreen(id: String, onBack: () -> Unit, onTest: (String) -> 
                         Text(entry.status.label, style = MaterialTheme.typography.headlineSmall,
                             color = if (entry.needsAttention) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)
                         if (entry.reason.isBlank() && entry.outcome != entry.status.label) Text(entry.outcome, style = MaterialTheme.typography.bodyLarge)
-                        if (entry.parsedAmount != null) Text("¥ %.2f".format(Locale.CHINA, entry.parsedAmount), style = MaterialTheme.typography.headlineLarge)
+                        if (entry.parsedAmount != null) Text("¥ ${Money.format(entry.parsedAmount)}", style = MaterialTheme.typography.headlineLarge)
                         Text(entry.reason.ifBlank { "历史版本未记录详细原因，可用原文重新测试。" }, style = MaterialTheme.typography.bodyMedium)
                         Text("处理阶段：${entry.stage}", style = MaterialTheme.typography.bodySmall)
                     }

@@ -1,5 +1,6 @@
 package com.financetracker.ui.screen.recognition
 
+import com.financetracker.domain.calculator.Money
 import android.content.Context
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -18,7 +19,6 @@ import com.financetracker.notification.NotificationLogger
 import com.financetracker.notification.RecognitionApps
 import com.financetracker.notification.parser.PaymentParsers
 import com.financetracker.ui.theme.CardLarge
-import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -37,7 +37,7 @@ fun NotificationTestScreen(sampleId: String, onBack: () -> Unit) {
     val app = RecognitionApps.find(pkg.trim())
     fun resetResult() { result = null; feedback = null }
     Scaffold(topBar = { TopAppBar(title = { Text("测试通知") }, navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回") } }) }) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding).imePadding().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Column(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).imePadding().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Text("输入一条通知，看看能否正确识别。", style = MaterialTheme.typography.titleMedium)
             Text("测试仅预览金额、方向和商户，不写入账本或识别记录。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (sampleId.isNotBlank()) Text(if (sample != null) "已从识别记录带入，可修改后再测试" else "原记录已清理，请重新输入样本", style = MaterialTheme.typography.bodySmall)
@@ -82,7 +82,7 @@ fun NotificationTestScreen(sampleId: String, onBack: () -> Unit) {
                     Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(text, style = MaterialTheme.typography.titleMedium, color = if (result != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
                         result?.let { value ->
-                            Text("${if (value.transactionType == TransactionType.INCOME) "收入" else "支出"} ¥%.2f".format(Locale.CHINA, value.amount), style = MaterialTheme.typography.headlineMedium)
+                            Text("${if (value.transactionType == TransactionType.INCOME) "收入" else "支出"} ¥${Money.format(value.amount)}", style = MaterialTheme.typography.headlineMedium)
                             Text("商户：${value.merchant}")
                             Text("付款方式：${value.paymentMethod ?: "通知未提供"}")
                             Text("归属途径：${when (value.accountType) { "wechat" -> "微信"; "alipay" -> "支付宝"; "bank" -> "银行卡"; "jd" -> "京东"; "meituan" -> "美团"; else -> value.accountType }}")

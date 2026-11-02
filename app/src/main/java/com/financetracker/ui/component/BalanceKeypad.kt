@@ -11,12 +11,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.financetracker.domain.calculator.MoneyExpression
+import com.financetracker.domain.calculator.Money
 import com.financetracker.ui.theme.CardSmall
-import java.math.BigDecimal
 
 @Composable
 fun BalanceCalculator(initialBalance: Double, onDone: (Double) -> Unit, modifier: Modifier = Modifier, doneLabel: String = "保存余额") {
-    var expression by rememberSaveable(initialBalance) { mutableStateOf(BigDecimal.valueOf(initialBalance).stripTrailingZeros().toPlainString()) }
+    var expression by rememberSaveable(initialBalance) { mutableStateOf(Money.format(initialBalance)) }
     var replaceOnDigit by rememberSaveable(initialBalance) { mutableStateOf(true) }
     val result = remember(expression) { MoneyExpression.evaluate(expression) }
     val hasOperation = expression.drop(1).any { it == '+' || it == '-' }
@@ -25,7 +25,7 @@ fun BalanceCalculator(initialBalance: Double, onDone: (Double) -> Unit, modifier
             Column(Modifier.fillMaxWidth().padding(16.dp), horizontalAlignment = Alignment.End) {
                 Text("账户余额 · 支持加减", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(expression.ifBlank { "0" }, style = MaterialTheme.typography.headlineSmall, maxLines = 2)
-                Text(if (hasOperation && result != null) "= ${result.toPlainString()}" else "可输入负数，表示负债", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(if (hasOperation && result != null) "= ${Money.format(result)}" else "可输入负数，表示负债", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
         listOf(listOf("7", "8", "9", "⌫"), listOf("4", "5", "6", "+"), listOf("1", "2", "3", "−"), listOf("C", "0", ".", "=")).forEach { keys ->
@@ -35,7 +35,7 @@ fun BalanceCalculator(initialBalance: Double, onDone: (Double) -> Unit, modifier
                         when (label) {
                             "C" -> { expression = ""; replaceOnDigit = false }
                             "⌫" -> { expression = expression.dropLast(1); replaceOnDigit = false }
-                            "=" -> result?.let { expression = it.stripTrailingZeros().toPlainString(); replaceOnDigit = true }
+                            "=" -> result?.let { expression = Money.format(it); replaceOnDigit = true }
                             "+", "−" -> { expression = MoneyExpression.append(expression, if (label == "−") "-" else "+"); replaceOnDigit = false }
                             else -> {
                                 expression = MoneyExpression.append(if (replaceOnDigit) "" else expression, label)

@@ -12,6 +12,7 @@ object PaymentParsers {
     fun isCandidate(pkg: String, title: String, text: String): Boolean {
         if (!supports(pkg)) return false
         if (pkg == "com.tencent.mm") return Regex("微信支付|微信收款|收款到账|收款通知|支付凭证|微信红包|转账到账").containsMatchIn(title)
+        if (pkg == "com.jd.jrapp" && "白条" !in "$title $text") return false
         return Regex("交易|支付|扣款|入账|收款|退款|到账|支出|消费|还款").containsMatchIn("$title $text")
     }
 

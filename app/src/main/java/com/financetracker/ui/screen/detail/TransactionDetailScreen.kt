@@ -1,5 +1,6 @@
 package com.financetracker.ui.screen.detail
 
+import com.financetracker.domain.calculator.Money
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -145,7 +146,7 @@ fun TransactionDetailScreen(
                 ) {
                     Column(modifier = Modifier.fillMaxWidth().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            "$prefix${String.format("%.2f", t.amount)}",
+                            "$prefix${Money.format(t.amount)}",
                             style = MaterialTheme.typography.displayLarge,
                             color = color,
                         )
@@ -338,7 +339,7 @@ fun TransactionDetailScreen(
         AlertDialog(
             onDismissRequest = { showRefundDialog = false },
             title = { Text("确认退款") },
-            text = { Text("确定要退款 ${String.format("%.2f", t.amount)} 元吗？退款将返还至原账户。") },
+            text = { Text("确定要退款 ${Money.format(t.amount)} 元吗？退款将返还至原账户。") },
             confirmButton = {
                 TextButton(onClick = {
                     viewModel.processRefund()

@@ -1,5 +1,6 @@
 package com.financetracker.ui.screen.statistics
 
+import com.financetracker.domain.calculator.Money
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -51,7 +52,7 @@ import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
 
-private fun money(value: Double) = String.format(Locale.CHINA, "%,.2f", value)
+private fun money(value: Double) = Money.format(value, grouping = true)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

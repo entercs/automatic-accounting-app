@@ -1,6 +1,7 @@
 package com.financetracker
 
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -50,7 +51,7 @@ fun App(initialNavigateToAdd: Boolean = false) {
         ) { innerPadding ->
             NavGraph(
                 navController = navController,
-                modifier = Modifier.padding(innerPadding)
+                modifier = Modifier.padding(innerPadding).consumeWindowInsets(innerPadding)
             )
         }
     }

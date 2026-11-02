@@ -1,5 +1,6 @@
 package com.financetracker.ui.component
 
+import com.financetracker.domain.calculator.Money
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -72,14 +73,14 @@ fun DateHeader(label: String, totalExpense: Double, totalIncome: Double) {
         ) {
             if (totalExpense > 0) {
                 Text(
-                    "支出 ${String.format("%.2f", totalExpense)}",
+                    "支出 ${Money.format(totalExpense)}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
                 )
             }
             if (totalIncome > 0) {
                 Text(
-                    "收入 ${String.format("%.2f", totalIncome)}",
+                    "收入 ${Money.format(totalIncome)}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.primary,
                 )

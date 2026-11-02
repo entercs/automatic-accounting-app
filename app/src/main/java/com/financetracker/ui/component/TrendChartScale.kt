@@ -1,7 +1,6 @@
 package com.financetracker.ui.component
 
-import java.math.BigDecimal
-import kotlin.math.ceil
+import com.financetracker.domain.calculator.Money
 import kotlin.math.floor
 import kotlin.math.log10
 import kotlin.math.pow
@@ -26,8 +25,7 @@ class TrendChartScale(peak: Double) {
     fun label(value: Double): String {
         val unit = if (maximum >= 100_000_000) 100_000_000.0 else if (maximum >= 10_000) 10_000.0 else 1.0
         val suffix = if (unit == 100_000_000.0) "亿" else if (unit == 10_000.0) "万" else ""
-        val decimals = ceil(-log10(step / unit)).toInt().coerceIn(0, 8) + 1
-        return BigDecimal.valueOf(value / unit).setScale(decimals, java.math.RoundingMode.HALF_UP).stripTrailingZeros().toPlainString() + suffix
+        return Money.format(value / unit) + suffix
     }
 }
 

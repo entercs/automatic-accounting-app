@@ -14,19 +14,19 @@ class TrendChartScaleTest {
     @Test fun zeroSeriesHasUsableNonzeroAxis() {
         val scale = TrendChartScale(0.0)
         assertEquals(1.0, scale.maximum, 0.0001)
-        assertEquals("0", scale.label(scale.ticks.last()))
+        assertEquals("0.00", scale.label(scale.ticks.last()))
     }
 
     @Test fun smallCurrencyAmountsHaveDistinctLabels() {
         val scale = TrendChartScale(0.03)
         assertTrue(scale.maximum >= 0.03)
-        assertEquals(listOf("0.04", "0.03", "0.02", "0.01", "0"), scale.ticks.map(scale::label))
+        assertEquals(listOf("0.04", "0.03", "0.02", "0.01", "0.00"), scale.ticks.map(scale::label))
     }
 
     @Test fun largeCurrencyLabelsPreserveFractionalUnits() {
         val scale = TrendChartScale(9000.0)
-        assertEquals(listOf("1万", "0.75万", "0.5万", "0.25万", "0万"), scale.ticks.map(scale::label))
-        assertEquals("1亿", TrendChartScale(90_000_000.0).label(100_000_000.0))
+        assertEquals(listOf("1.00万", "0.75万", "0.50万", "0.25万", "0.00万"), scale.ticks.map(scale::label))
+        assertEquals("1.00亿", TrendChartScale(90_000_000.0).label(100_000_000.0))
     }
 
     @Test fun touchingDrawnEndpointsSelectsFirstAndLastDay() {

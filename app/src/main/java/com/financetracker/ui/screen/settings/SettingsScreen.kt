@@ -1,5 +1,6 @@
 package com.financetracker.ui.screen.settings
 
+import com.financetracker.domain.calculator.Money
 import android.content.Intent
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -32,7 +33,6 @@ import com.financetracker.ui.component.AccountingHealthCard
 import com.financetracker.ui.component.BalanceCalculator
 import com.financetracker.ui.theme.CardLarge
 import com.financetracker.ui.theme.HeaderGradient
-import java.util.Locale
 
 @Composable
 private fun settingsModel(): SettingsViewModel {
@@ -227,4 +227,4 @@ fun AccountingSettingsScreen(onNavigateBack: () -> Unit, onOpenRecognition: () -
     }
 }
 
-private fun money(value: Double) = String.format(Locale.CHINA, "%,.2f", value)
+private fun money(value: Double) = Money.format(value, grouping = true)

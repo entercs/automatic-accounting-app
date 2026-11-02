@@ -1,5 +1,6 @@
 package com.financetracker.notification
 
+import com.financetracker.domain.calculator.Money
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -106,7 +107,7 @@ object AccountingEngine {
             val pending = PendingIntent.getActivity(context, 0, Intent(context, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
             manager.notify(1001, NotificationCompat.Builder(context, "auto_accounting")
                 .setSmallIcon(android.R.drawable.ic_menu_agenda).setContentTitle("已自动记账")
-                .setContentText("${value.merchant} · ¥%.2f".format(value.amount)).setContentIntent(pending).setAutoCancel(true).build())
+                .setContentText("${value.merchant} · ¥${Money.format(value.amount)}").setContentIntent(pending).setAutoCancel(true).build())
         }
     }
 }

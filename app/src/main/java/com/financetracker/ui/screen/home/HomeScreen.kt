@@ -1,5 +1,6 @@
 package com.financetracker.ui.screen.home
 
+import com.financetracker.domain.calculator.Money
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -117,8 +118,7 @@ fun HomeScreen(
         else pagedTransactions.filter { tx ->
             tx.merchant.contains(searchQuery, ignoreCase = true) ||
             tx.note.contains(searchQuery, ignoreCase = true) ||
-            "%.2f".format(tx.amount).contains(searchQuery) ||
-            tx.amount.toBigDecimal().stripTrailingZeros().toPlainString().contains(searchQuery)
+            Money.format(tx.amount).contains(searchQuery)
         }
     }
     val dailyGroups = remember(displayedTransactions) { groupTransactionsByDay(displayedTransactions) }
@@ -245,7 +245,7 @@ fun HomeScreen(
                         val balanceColor = if (balance >= 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
                         Text("本月结余", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text(
-                            "¥ ${String.format("%,.2f", balance)}",
+                            "¥ ${Money.format(balance, grouping = true)}",
                             style = MaterialTheme.typography.displayLarge,
                             color = balanceColor,
                         )
@@ -353,7 +353,7 @@ private fun SummaryItem(label: String, amount: Double, color: Color) {
         Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(modifier = Modifier.height(4.dp))
         Text(
-            text = "${String.format("%.2f", amount)}",
+            text = Money.format(amount),
             style = MaterialTheme.typography.bodyLarge,
             color = color,
         )

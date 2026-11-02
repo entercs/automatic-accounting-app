@@ -1,5 +1,6 @@
 package com.financetracker.ui.component
 
+import com.financetracker.domain.calculator.Money
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -144,7 +145,7 @@ fun TransactionItem(
                 else -> MaterialTheme.colorScheme.error
             }
             Text(
-                text = "$prefix${String.format("%.2f", transaction.amount)}",
+                text = "$prefix${Money.format(transaction.amount)}",
                 style = MaterialTheme.typography.bodyLarge,
                 color = color,
             )

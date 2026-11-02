@@ -1,5 +1,6 @@
 package com.financetracker.ui.screen.search
 
+import com.financetracker.domain.calculator.Money
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -36,7 +37,6 @@ import com.financetracker.domain.model.Transaction
 import com.financetracker.domain.model.TransactionType
 import com.financetracker.ui.component.*
 import com.financetracker.ui.theme.CardLarge
-import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -213,4 +213,4 @@ private fun ResetFiltersDialog(clearQuery: Boolean = false, onDismiss: () -> Uni
         dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } })
 }
 
-private fun money(value: Double) = String.format(Locale.CHINA, "%,.2f", value)
+private fun money(value: Double) = Money.format(value, grouping = true)

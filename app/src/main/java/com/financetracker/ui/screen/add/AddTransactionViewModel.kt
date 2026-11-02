@@ -7,6 +7,7 @@ import com.financetracker.data.preferences.AppPreferences
 import com.financetracker.data.repository.CategoryRepository
 import com.financetracker.data.repository.PaymentAccountRepository
 import com.financetracker.data.repository.TransactionRepository
+import com.financetracker.domain.calculator.Money
 import com.financetracker.domain.model.Category
 import com.financetracker.domain.model.PaymentAccount
 import com.financetracker.domain.model.Transaction
@@ -20,7 +21,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.math.BigDecimal
-import java.math.RoundingMode
 
 class AddTransactionViewModel(
     private val transactionRepo: TransactionRepository,
@@ -95,7 +95,7 @@ class AddTransactionViewModel(
         editId = id
         viewModelScope.launch {
             val t = transactionRepo.getById(id) ?: return@launch
-            _amount.value = t.amount.toBigDecimal().stripTrailingZeros().toPlainString()
+            _amount.value = Money.format(t.amount)
             _selectedType.value = t.type
             _selectedCategoryId.value = t.categoryId
             _selectedAccountId.value = t.accountId
@@ -110,7 +110,7 @@ class AddTransactionViewModel(
     fun loadRecognitionSample(id: String) {
         val sample = com.financetracker.notification.NotificationLogger.getAll().find { it.id == id } ?: return
         val value = com.financetracker.notification.parser.PaymentParsers.parse(sample.packageName, sample.title, sample.text)
-        _amount.value = (value?.amount ?: sample.parsedAmount)?.toBigDecimal()?.stripTrailingZeros()?.toPlainString().orEmpty()
+        _amount.value = (value?.amount ?: sample.parsedAmount)?.let { Money.format(it) }.orEmpty()
         _selectedType.value = value?.transactionType ?: sample.transactionType ?: TransactionType.EXPENSE
         _merchant.value = value?.merchant ?: sample.merchant.orEmpty()
         _date.value = sample.postedAt ?: sample.timestamp
@@ -130,7 +130,7 @@ class AddTransactionViewModel(
     fun loadRefund(transactionId: Long) {
         viewModelScope.launch {
             val t = transactionRepo.getById(transactionId) ?: return@launch
-            _amount.value = t.amount.toBigDecimal().stripTrailingZeros().toPlainString()
+            _amount.value = Money.format(t.amount)
             _selectedType.value = TransactionType.INCOME
             _selectedCategoryId.value = t.categoryId
             _selectedAccountId.value = t.accountId
@@ -192,6 +192,8 @@ class AddTransactionViewModel(
 
     private fun appendChar(d: Char) {
         val v = _amount.value
+        val segment = v.substring(v.indexOfLast { it == '+' || it == '-' } + 1)
+        if ('.' in segment && segment.substringAfter('.').length >= Money.SCALE) return
         if (v == "0") {
             _amount.value = d.toString()
         } else if (v.length < 15) {
@@ -234,10 +236,8 @@ class AddTransactionViewModel(
         if (v.isEmpty()) return
         val expr = if (v.last() in listOf('+', '-')) v.dropLast(1) else v
         if (expr.isEmpty()) return
-        if (!expr.any { it == '+' || it == '-' }) return
-
         val result = evaluateExpression(expr) ?: return
-        _amount.value = result.setScale(2, RoundingMode.HALF_UP).toPlainString()
+        _amount.value = Money.format(result)
         _showEquals.value = false
     }
 
@@ -275,9 +275,9 @@ class AddTransactionViewModel(
         // Strip trailing operator and evaluate if needed
         val cleanExpr = if (expr.isNotEmpty() && expr.last() in listOf('+', '-')) expr.dropLast(1) else expr
         val amt = if (cleanExpr.any { it == '+' || it == '-' }) {
-            evaluateExpression(cleanExpr)?.setScale(2, RoundingMode.HALF_UP)?.toDouble() ?: run { saveTriggered = false; return }
+            evaluateExpression(cleanExpr)?.let { Money.round(it).toDouble() } ?: run { saveTriggered = false; return }
         } else {
-            cleanExpr.toBigDecimalOrNull()?.setScale(2, RoundingMode.HALF_UP)?.toDouble() ?: run { saveTriggered = false; return }
+            cleanExpr.toBigDecimalOrNull()?.let { Money.round(it).toDouble() } ?: run { saveTriggered = false; return }
         }
         if (amt <= 0) { saveTriggered = false; return }
         if (_selectedAccountId.value <= 0) { saveTriggered = false; return }

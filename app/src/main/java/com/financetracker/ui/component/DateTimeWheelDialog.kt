@@ -2,6 +2,7 @@ package com.financetracker.ui.component
 
 import android.os.Build
 import android.view.ViewGroup
+import android.view.ViewOutlineProvider
 import android.widget.NumberPicker
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -20,6 +21,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -55,9 +57,12 @@ private fun DateTimeWheel(label: String, value: Int, range: IntRange, wrap: Bool
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         AndroidView(
-            modifier = Modifier.fillMaxWidth().height(164.dp),
+            modifier = Modifier.fillMaxWidth().height(164.dp).clipToBounds(),
             factory = { context ->
                 NumberPicker(context).apply {
+                    // Native fading edges do not clip text that scrolls outside the wheel.
+                    outlineProvider = ViewOutlineProvider.BOUNDS
+                    clipToOutline = true
                     descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
                     setFormatter { number -> if (label == "年") number.toString() else String.format(Locale.CHINA, "%02d", number) }
                     setOnValueChangedListener { _, _, newValue -> currentOnChange(newValue) }

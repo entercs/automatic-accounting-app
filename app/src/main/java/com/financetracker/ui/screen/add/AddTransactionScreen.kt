@@ -1,5 +1,6 @@
 package com.financetracker.ui.screen.add
 
+import com.financetracker.domain.calculator.Money
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -173,7 +174,7 @@ fun AddTransactionScreen(editTransactionId: Long? = null, refundTransactionId: L
                             readOnly = true,
                                                     )
                         VoiceInputButton { (amt, _, merch) ->
-                            amt?.let { a -> viewModel.setAmount(a.toBigDecimal().stripTrailingZeros().toPlainString()) }
+                            amt?.let { a -> viewModel.setAmount(Money.format(a)) }
                             merch?.let { m -> viewModel.setMerchant(m) }
                         }
                     }

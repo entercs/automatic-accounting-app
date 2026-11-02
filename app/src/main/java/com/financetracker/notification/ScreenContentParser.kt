@@ -1,5 +1,6 @@
 package com.financetracker.notification
 
+import com.financetracker.domain.calculator.Money
 import android.util.Log
 import android.view.accessibility.AccessibilityNodeInfo
 import com.financetracker.domain.model.ParsedNotification
@@ -138,7 +139,7 @@ class ScreenContentParser {
 
         // If no good merchant found, find lines with amount nearby
         if (merchant.isBlank()) {
-            val amountIdx = combined.indexOf("${String.format("%.2f", amount)}")
+            val amountIdx = combined.indexOf("${Money.format(amount)}")
             if (amountIdx > 0) {
                 val before = combined.substring(0, amountIdx).trim()
                 val candidate = before.takeLast(30).trim()

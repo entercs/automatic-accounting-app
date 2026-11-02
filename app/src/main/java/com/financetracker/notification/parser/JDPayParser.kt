@@ -4,7 +4,19 @@ import com.financetracker.domain.model.ParsedNotification
 import com.financetracker.domain.model.TransactionType
 
 class JDPayParser : NotificationParser {
-    override val supportedPackages = listOf("com.jingdong.app.mall")
+    override val supportedPackages = listOf("com.jingdong.app.mall", "com.jd.jrapp")
+
+    private val financeNonPayments = Regex("还款|待还|应还|额度|提额|金条|借款|贷款|理财|申购|赎回|收益")
+    private val completedRefund = Regex("退款(?:成功|已到账|到账|已入账|入账成功)")
+    private val completedPayment = Regex("支付成功|付款成功|扣款成功|支付完成|付款完成|已支付")
+
+    // Finance also sends loan, investment and repayment notices; only handle evidenced Baitiao trades.
+    private fun isFinanceTransaction(title: String, combined: String): Boolean {
+        if ("白条" !in combined || financeNonPayments.containsMatchIn(combined)) return false
+        if ("退款" in combined) return completedRefund.containsMatchIn(combined)
+        return completedPayment.containsMatchIn(combined) ||
+            ("白条交易" in title && "消费" in combined && PaymentAmount.find(combined) != null)
+    }
 
     // 收入关键词
     private val incomeKeywords = listOf("收款", "入账", "到账", "退款", "返")
@@ -57,8 +69,10 @@ class JDPayParser : NotificationParser {
     )
 
     override fun parse(packageName: String, title: String, text: String): ParsedNotification? {
-        if (packageName != "com.jingdong.app.mall") return null
+        if (packageName !in supportedPackages) return null
         val combined = "$title $text"
+        val isFinance = packageName == "com.jd.jrapp"
+        if (isFinance && !isFinanceTransaction(title, combined)) return null
 
         // 非交易类标题直接跳过
         if (nonTransactionTitles.any { title.contains(it) }) return null
@@ -113,7 +127,7 @@ class JDPayParser : NotificationParser {
         val amount = PaymentAmount.find(combined) ?: amounts.distinct().singleOrNull() ?: return null
 
         // 判断收入还是支出
-        val isIncome = incomeKeywords.any { combined.contains(it) }
+        val isIncome = if (isFinance) completedRefund.containsMatchIn(combined) else incomeKeywords.any { combined.contains(it) }
         val type = if (isIncome) TransactionType.INCOME else TransactionType.EXPENSE
 
         return ParsedNotification(
@@ -122,6 +136,7 @@ class JDPayParser : NotificationParser {
             accountType = "jd",
             transactionType = type,
             payTime = System.currentTimeMillis(),
+            paymentMethod = if ("白条" in combined) "白条" else null,
         )
     }
 }

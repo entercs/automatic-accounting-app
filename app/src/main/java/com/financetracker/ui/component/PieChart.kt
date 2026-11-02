@@ -1,5 +1,6 @@
 package com.financetracker.ui.component
 
+import com.financetracker.domain.calculator.Money
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -78,7 +79,7 @@ fun PieChart(
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(slice.label, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
                     Text(
-                        "${String.format("%.2f", slice.value)} (${String.format("%.1f", slice.value / total * 100)}%)",
+                        "${Money.format(slice.value.toDouble())} (${String.format("%.1f", slice.value / total * 100)}%)",
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }

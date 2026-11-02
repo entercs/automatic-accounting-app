@@ -1,5 +1,6 @@
 package com.financetracker.notification
 
+import com.financetracker.domain.calculator.Money
 import com.financetracker.domain.model.TransactionType
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -49,7 +50,7 @@ data class NotificationLogEntry(
         append("\n包名: $packageName")
         postedAt?.let { append("\n通知发布时间: ${formatTime(it)}") }
         append("\n标题: $title\n内容: $text")
-        parsedAmount?.let { append("\n金额: %.2f".format(Locale.CHINA, it)) }
+        parsedAmount?.let { append("\n金额: ${Money.format(it)}") }
         transactionType?.let { append("\n方向: ${if (it == TransactionType.INCOME) "收入" else "支出"}") }
         merchant?.let { append("\n商户: $it") }
         paymentMethod?.let { append("\n付款方式: $it") }
@@ -67,6 +68,7 @@ object RecognitionApps {
         RecognitionApp("wechat", "微信", listOf("com.tencent.mm"), "微信支付"),
         RecognitionApp("alipay", "支付宝", listOf("com.eg.android.AlipayGphone", "com.eg.android.AlipayGphoneRC", "com.eg.android.AlipayGphoneGlobal", "hk.alipay.wallet")),
         RecognitionApp("jd", "京东", listOf("com.jingdong.app.mall"), "支付成功"),
+        RecognitionApp("jd_finance", "京东金融", listOf("com.jd.jrapp"), "白条交易提醒"),
         RecognitionApp("meituan", "美团", listOf("com.sankuai.meituan"), "支付成功"),
         RecognitionApp("takeout", "美团外卖", listOf("com.sankuai.meituan.takeoutnew"), "支付成功"),
         RecognitionApp("dianping", "大众点评", listOf("com.dianping.v1"), "支付成功"),

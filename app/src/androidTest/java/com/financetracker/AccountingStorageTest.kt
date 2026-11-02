@@ -47,6 +47,29 @@ class AccountingStorageTest {
         } finally { db.close() }
     }
 
+    @Test fun jdFinanceBaitiaoConsumptionRecordsOnceInJdAccount() = runBlocking {
+        val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).build()
+        try {
+            val value = com.financetracker.notification.parser.PaymentParsers.parse(
+                "com.jd.jrapp", "白条交易提醒", "【未分期】您于11月2日消费8.49元，查看详情>>",
+            )!!
+            val recorder = PaymentRecorder(db)
+            val now = System.currentTimeMillis()
+            assertEquals("已记账", recorder.record(value, "jd-finance-baitiao", now))
+            assertEquals("重复已跳过", recorder.record(value, "jd-finance-baitiao", now))
+            assertEquals(1, db.transactionDao().count())
+            val tx = db.transactionDao().getById(1)!!
+            val account = db.paymentAccountDao().getByType("jd")!!
+            assertEquals(account.id, tx.accountId)
+            assertEquals(8.49, tx.amount, .00001)
+            assertEquals("EXPENSE", tx.type)
+            assertEquals("付款方式：白条", tx.note)
+            assertEquals(-8.49, account.balance, .00001)
+            assertEquals(0.0, db.paymentAccountDao().getByType("wechat")!!.balance, .00001)
+            assertEquals(0.0, db.paymentAccountDao().getByType("alipay")!!.balance, .00001)
+        } finally { db.close() }
+    }
+
     @Test fun dailyTotalsUseTheDevicesLocalMidnight() = runBlocking {
         val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).build()
         try {
