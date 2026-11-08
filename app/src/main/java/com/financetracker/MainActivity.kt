@@ -10,6 +10,7 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         com.financetracker.notification.AccessibilityStateHolder.refresh()
         com.financetracker.notification.PaymentMonitor.reconnect(this)
+        com.financetracker.notification.AccountingProtectionService.ensureRunning(this)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {

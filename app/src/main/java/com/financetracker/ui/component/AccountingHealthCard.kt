@@ -82,6 +82,24 @@ fun AccountingHealthCard(onOpenRecords: () -> Unit = {}) {
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
+                    Text("后台保护", style = MaterialTheme.typography.bodyLarge)
+                    Text(when {
+                        !state.protectionEnabled -> "已关闭，仍可接收通知，但后台恢复保护停止"
+                        !state.authorized -> "开启通知读取后运行"
+                        state.protectionRunning -> "运行中，通知断开后会自动重试"
+                        else -> "尚未运行，请允许后台运行后重试"
+                    }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Switch(checked = state.protectionEnabled, onCheckedChange = { PaymentMonitor.setProtectionEnabled(context, it) })
+            }
+            Text("启用后会保留一条后台运行通知。小米/Redmi建议允许自启动、将省电策略设为无限制，并锁定最近任务中的记账助手；系统强行停止应用后仍需手动打开恢复。", style = MaterialTheme.typography.bodySmall)
+            state.protectionIssue?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
+            if (state.authorized && state.protectionEnabled && !state.protectionRunning) {
+                OutlinedButton(onClick = { AccountingProtectionService.ensureRunning(context); PaymentMonitor.reconnect(context) }) { Text("恢复后台保护") }
+            }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
                     Text("屏幕识别 · 可选补充", style = MaterialTheme.typography.bodyLarge)
                     Text(when {
                         accessibilityConnected -> "已连接，可补充识别支付成功页面"

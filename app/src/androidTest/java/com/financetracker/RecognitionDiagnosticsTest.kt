@@ -41,6 +41,18 @@ class RecognitionDiagnosticsTest {
         assertEquals("结果待核对", item.outcome)
         assertTrue(item.reason.contains("核对账本"))
     }
+    @Test fun processingAndReminderTimesSurvivePersistenceWithoutRewritingTransactionOrArrivalTimes() {
+        val item = record(System.currentTimeMillis()).copy(
+            outcome = "已记账", parsed = true, parsedAmount = 4.00, postedAt = 1_000,
+            processingStartedAt = 2_000, recordedAt = 3_000, processedAt = 3_200,
+            reminderRequestedAt = 3_010, reminderPostedAt = 3_100, reminderOutcome = "已提交系统",
+        )
+        assertEquals(item, RecognitionCodec.decode(RecognitionCodec.encode(listOf(item))).single())
+        val legacy = RecognitionCodec.decode("""[{"time":1000,"package":"cmb.pb","title":"招商银行","outcome":"已跳过"}]""").single()
+        assertNull(legacy.recordedAt)
+        assertNull(legacy.reminderPostedAt)
+        assertNull(legacy.reminderOutcome)
+    }
     @Test fun processingUpdatesOneRecordAndSurvivesReopening() = runBlocking {
         val name = "test_recognition_${System.nanoTime()}"
         val prefs = context.getSharedPreferences(name, Context.MODE_PRIVATE)

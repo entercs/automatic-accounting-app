@@ -83,6 +83,30 @@ class AccountingStorageTest {
         } finally { db.close() }
     }
 
+    @Test fun delayedScreenshotPaymentsKeepOriginalDateAndCannotAdjustBalancesTwice() = runBlocking {
+        val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).build()
+        try {
+            val received = System.currentTimeMillis()
+            val posted = received - 2 * 60 * 60_000L
+            val samples = listOf(
+                Triple("cmb.pb", "招商银行", "您账户2741在【抖音支付-抖音生活服务】发生快捷支付扣款，人民币80.90"),
+                Triple("com.eg.android.AlipayGphone", "交易提醒", "你在北京一卡通有一笔4.00元的免密/自动扣款支付，点击领取8个支付宝积分。"),
+            )
+            val recorder = PaymentRecorder(db)
+            samples.forEach { (pkg, title, body) ->
+                assertNull(com.financetracker.notification.NotificationPreflight.check(false, body, true, posted, received, posted - 60_000).reason)
+                val value = com.financetracker.notification.parser.PaymentParsers.parse(pkg, title, body)!!.copy(payTime = posted)
+                assertEquals("已记账", recorder.record(value, "delayed-$pkg", received))
+                assertEquals("重复已跳过", recorder.record(value, "delayed-$pkg", received + 1))
+            }
+            assertEquals(2, db.transactionDao().count())
+            assertEquals(posted, db.transactionDao().getById(1)!!.date)
+            assertEquals(posted, db.transactionDao().getById(2)!!.date)
+            assertEquals(-80.90, db.paymentAccountDao().getByType("bank")!!.balance, .00001)
+            assertEquals(-4.00, db.paymentAccountDao().getByType("alipay")!!.balance, .00001)
+        } finally { db.close() }
+    }
+
     @Test fun receiptSurvivesReopen() = runBlocking {
         val name = "test_receipt_${System.nanoTime()}.db"
         try {

@@ -34,6 +34,12 @@ object RecognitionCodec {
                 merchant = row.optString("merchant").ifBlank { null },
                 transactionType = runCatching { TransactionType.valueOf(row.optString("type")) }.getOrNull(),
                 paymentMethod = row.optString("method").ifBlank { null },
+                processingStartedAt = row.optionalTime("processingStartedAt"),
+                processedAt = row.optionalTime("processedAt"),
+                recordedAt = row.optionalTime("recordedAt"),
+                reminderRequestedAt = row.optionalTime("reminderRequestedAt"),
+                reminderPostedAt = row.optionalTime("reminderPostedAt"),
+                reminderOutcome = row.optString("reminderOutcome").ifBlank { null },
             )
         }.getOrNull() }
     }
@@ -42,8 +48,12 @@ object RecognitionCodec {
         entries.forEach { e -> put(JSONObject().put("id", e.id).put("time", e.timestamp).put("package", e.packageName)
             .put("title", e.title).put("text", e.text).put("parsed", e.parsed).put("amount", e.parsedAmount)
             .put("outcome", e.outcome).put("source", e.source).put("reason", e.reason).put("stage", e.stage)
-            .put("postedAt", e.postedAt).put("merchant", e.merchant).put("type", e.transactionType?.name).put("method", e.paymentMethod)) }
+            .put("postedAt", e.postedAt).put("merchant", e.merchant).put("type", e.transactionType?.name).put("method", e.paymentMethod)
+            .put("processingStartedAt", e.processingStartedAt).put("processedAt", e.processedAt).put("recordedAt", e.recordedAt)
+            .put("reminderRequestedAt", e.reminderRequestedAt).put("reminderPostedAt", e.reminderPostedAt).put("reminderOutcome", e.reminderOutcome)) }
     }.toString()
+
+    private fun JSONObject.optionalTime(key: String): Long? = if (has(key) && !isNull(key)) getLong(key) else null
 }
 
 /** Small bounded local store. Serial IO always persists the latest state, including a clear during processing. */
@@ -88,6 +98,10 @@ object NotificationLogger {
     fun refresh() { store?.refresh() }
     fun getAll(): List<NotificationLogEntry> = store?.logs?.value.orEmpty()
     fun clear() { store?.clear() }
+    fun runtime(title: String, reason: String) {
+        log(NotificationLogEntry(System.currentTimeMillis(), NotificationLogEntry.SERVICE_PACKAGE,
+            title, "", false, outcome = "服务动态", source = "服务状态", reason = reason, stage = "后台运行"))
+    }
     fun service(connected: Boolean, reason: String) {
         log(NotificationLogEntry(System.currentTimeMillis(), NotificationLogEntry.SERVICE_PACKAGE,
             if (connected) "通知监听已连接" else "通知监听已断开", "", false,

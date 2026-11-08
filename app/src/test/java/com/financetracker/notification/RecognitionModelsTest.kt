@@ -64,10 +64,16 @@ class RecognitionModelsTest {
     }
     @Test fun ageChecksNotificationArrivalRatherThanTimeUserViewsTheLog() {
         assertNull(NotificationPreflight.skipReason(false, "支出", true, now - 300_000, now))
-        assertTrue(NotificationPreflight.skipReason(false, "支出", true, now - 300_001, now)!!.contains("五分钟"))
+        assertNull(NotificationPreflight.skipReason(false, "支出", true, now - 300_001, now))
+        assertTrue(NotificationPreflight.skipReason(false, "支出", true, now - NotificationPreflight.MAX_DELAY_MILLIS - 1, now)!!.contains("24小时"))
     }
     @Test fun serviceEntryIsClearlyLabelledAndNotAPaymentSource() {
         assertEquals("通知服务", entry(NotificationLogEntry.SERVICE_PACKAGE).appLabel)
         assertEquals(RecognitionStatus.SERVICE, entry(outcome = "服务动态").status)
+    }
+    @Test fun legacyFiveMinuteSkipsAreVisibleInAttentionFilterWithoutAutomaticallyReplayingThem() {
+        val item = entry(outcome = "已跳过").copy(reason = "通知超过五分钟，保留样本供核对，未自动补入旧交易")
+        assertTrue(RecognitionFilter(attentionOnly = true).matches(item))
+        assertEquals(RecognitionStatus.SKIPPED, item.status)
     }
 }

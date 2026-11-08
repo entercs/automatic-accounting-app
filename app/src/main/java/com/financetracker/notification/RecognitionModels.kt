@@ -40,15 +40,28 @@ data class NotificationLogEntry(
     val merchant: String? = null,
     val transactionType: TransactionType? = null,
     val paymentMethod: String? = null,
+    val processingStartedAt: Long? = null,
+    val processedAt: Long? = null,
+    val recordedAt: Long? = null,
+    val reminderRequestedAt: Long? = null,
+    val reminderPostedAt: Long? = null,
+    val reminderOutcome: String? = null,
 ) {
     val status get() = RecognitionStatus.of(outcome)
-    val needsAttention get() = status in setOf(RecognitionStatus.UNRECOGNIZED, RecognitionStatus.PENDING, RecognitionStatus.FAILED)
+    val needsAttention get() = status in setOf(RecognitionStatus.UNRECOGNIZED, RecognitionStatus.PENDING, RecognitionStatus.FAILED) ||
+        (status == RecognitionStatus.SKIPPED && reason.contains("五分钟"))
     val appLabel get() = if (packageName == SERVICE_PACKAGE) "通知服务" else RecognitionApps.find(packageName)?.label ?: packageName
     val formatted: String get() = buildString {
         append("${formatTime(timestamp)} | $outcome\n应用: $appLabel\n采集方式: $source\n阶段: $stage")
         if (reason.isNotBlank()) append("\n原因: $reason")
         append("\n包名: $packageName")
         postedAt?.let { append("\n通知发布时间: ${formatTime(it)}") }
+        processingStartedAt?.let { append("\n开始处理时间: ${formatTime(it)}") }
+        processedAt?.let { append("\n处理结束时间: ${formatTime(it)}") }
+        recordedAt?.let { append("\n入账完成时间: ${formatTime(it)}") }
+        reminderRequestedAt?.let { append("\n提醒尝试时间: ${formatTime(it)}") }
+        reminderPostedAt?.let { append("\n提醒提交时间: ${formatTime(it)}") }
+        reminderOutcome?.let { append("\n提醒结果: $it") }
         append("\n标题: $title\n内容: $text")
         parsedAmount?.let { append("\n金额: ${Money.format(it)}") }
         transactionType?.let { append("\n方向: ${if (it == TransactionType.INCOME) "收入" else "支出"}") }
@@ -109,12 +122,21 @@ object RecognitionRetention {
         entries.filter { it.timestamp >= now - MAX_AGE }.sortedByDescending { it.timestamp }.take(MAX_ENTRIES)
 }
 
+data class NotificationAdmission(val reason: String? = null, val needsReview: Boolean = false)
+
 object NotificationPreflight {
-    fun skipReason(groupSummary: Boolean, body: String, candidate: Boolean, postedAt: Long, now: Long): String? = when {
-        groupSummary -> "分组汇总通知：等待单笔通知，避免重复入账"
-        body.isBlank() -> "通知正文为空，无法获取交易金额"
-        !candidate -> "不符合支付通知特征，仅保留接收信息"
-        now - postedAt > 5 * 60_000L -> "通知超过五分钟，保留样本供核对，未自动补入旧交易"
-        else -> null
+    const val MAX_DELAY_MILLIS = 24 * 60 * 60_000L
+
+    fun check(groupSummary: Boolean, body: String, candidate: Boolean, postedAt: Long, now: Long, captureStartedAt: Long? = null): NotificationAdmission = when {
+        groupSummary -> NotificationAdmission("分组汇总通知：等待单笔通知，避免重复入账")
+        body.isBlank() -> NotificationAdmission("通知正文为空，无法获取交易金额")
+        !candidate -> NotificationAdmission("不符合支付通知特征，仅保留接收信息")
+        postedAt <= 0 || postedAt > now + 60_000L -> NotificationAdmission("通知发布时间异常，请核对后补记", true)
+        captureStartedAt != null && postedAt < captureStartedAt -> NotificationAdmission("通知早于本次采集启用时间，保留待核对，不自动回放历史交易", true)
+        now - postedAt > MAX_DELAY_MILLIS -> NotificationAdmission("通知延迟超过24小时，保留待核对，请核对账本后补记", true)
+        else -> NotificationAdmission()
     }
+
+    fun skipReason(groupSummary: Boolean, body: String, candidate: Boolean, postedAt: Long, now: Long): String? =
+        check(groupSummary, body, candidate, postedAt, now).reason
 }

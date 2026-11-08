@@ -2,6 +2,7 @@ package com.financetracker.ui.screen.recognition
 
 import com.financetracker.domain.calculator.Money
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -45,6 +46,7 @@ fun RecognitionRecordsScreen(onBack: () -> Unit, onDetail: (String) -> Unit, onT
         while (true) { NotificationLogger.refresh(); kotlinx.coroutines.delay(60_000) }
     }
     Scaffold(topBar = {
+        Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background)) {
         TopAppBar(title = { Text("识别记录") }, navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回") } },
             actions = {
                 TextButton(onClick = onTest) { Text("测试通知") }
@@ -58,23 +60,27 @@ fun RecognitionRecordsScreen(onBack: () -> Unit, onDetail: (String) -> Unit, onT
                     }
                 }
             })
+            Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    FilterChip(filter.attentionOnly, onClick = { filter = filter.copy(attentionOnly = !filter.attentionOnly, statuses = emptySet()) }, label = { Text("需关注") })
+                    Spacer(Modifier.width(8.dp))
+                    OutlinedButton(onClick = { showFilter = true }) { Text("筛选") }
+                    Spacer(Modifier.weight(1f))
+                    Text("${visible.size}条", style = MaterialTheme.typography.labelLarge)
+                }
+                val labels = filterLabels(filter)
+                if (labels.isNotEmpty()) Text(labels.joinToString(" · "), maxLines = 2, overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+            }
+        }
     }) { padding ->
-        LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        LazyColumn(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(if (connection.connected) "通知读取已连接" else if (connection.authorized) "通知已授权，当前未连接" else "通知读取未授权",
                         style = MaterialTheme.typography.titleMedium, color = if (connection.connected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
                     Text("保留近7天，最多1000条 · 仅保存在本机", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     if (logs.isNotEmpty()) Text("已保留记录：${recordTime(logs.last().timestamp, "MM-dd HH:mm")} 至 ${recordTime(logs.first().timestamp, "MM-dd HH:mm")}", style = MaterialTheme.typography.bodySmall)
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        FilterChip(filter.attentionOnly, onClick = { filter = filter.copy(attentionOnly = !filter.attentionOnly, statuses = emptySet()) }, label = { Text("需关注") })
-                        Spacer(Modifier.width(8.dp))
-                        OutlinedButton(onClick = { showFilter = true }) { Text("筛选") }
-                        Spacer(Modifier.weight(1f))
-                        Text("${visible.size}条", style = MaterialTheme.typography.labelLarge)
-                    }
-                    val labels = filterLabels(filter)
-                    if (labels.isNotEmpty()) Text(labels.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
                     if (copied) Text("已复制当前筛选结果", style = MaterialTheme.typography.bodySmall)
                 }
             }

@@ -44,6 +44,16 @@ fun RecognitionDetailScreen(id: String, onBack: () -> Unit, onTest: (String) -> 
                 DetailLine("采集方式", entry.source)
                 DetailLine("接收时间", recordTime(entry.timestamp, "yyyy-MM-dd HH:mm:ss"))
                 entry.postedAt?.let { DetailLine("通知发布时间", recordTime(it, "yyyy-MM-dd HH:mm:ss")) }
+                entry.postedAt?.let {
+                    val delaySeconds = ((entry.timestamp - it).coerceAtLeast(0) / 1000)
+                    DetailLine("通知接收延迟", if (delaySeconds < 60) "${delaySeconds}秒" else "${delaySeconds / 60}分${delaySeconds % 60}秒")
+                }
+                entry.processingStartedAt?.let { DetailLine("开始处理时间", recordTime(it, "yyyy-MM-dd HH:mm:ss")) }
+                entry.recordedAt?.let { DetailLine("入账完成时间", recordTime(it, "yyyy-MM-dd HH:mm:ss")) }
+                entry.processedAt?.let { DetailLine("处理结束时间", recordTime(it, "yyyy-MM-dd HH:mm:ss")) }
+                entry.reminderRequestedAt?.let { DetailLine("提醒尝试时间", recordTime(it, "yyyy-MM-dd HH:mm:ss")) }
+                entry.reminderPostedAt?.let { DetailLine("提醒提交时间", recordTime(it, "yyyy-MM-dd HH:mm:ss")) }
+                entry.reminderOutcome?.let { DetailLine("提醒结果", it) }
                 entry.transactionType?.let { DetailLine("收支方向", if (it == TransactionType.INCOME) "收入" else "支出") }
                 entry.merchant?.let { DetailLine("商户", it) }
                 entry.paymentMethod?.let { DetailLine("付款方式", it) }
