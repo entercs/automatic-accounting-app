@@ -7,4 +7,5 @@ data class ParsedNotification(
     val transactionType: TransactionType = TransactionType.EXPENSE,
     val payTime: Long,
     val paymentMethod: String? = null,
+    val bankTransfer: BankTransfer? = null,
 )

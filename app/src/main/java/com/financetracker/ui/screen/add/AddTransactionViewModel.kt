@@ -8,11 +8,20 @@ import com.financetracker.data.repository.CategoryRepository
 import com.financetracker.data.repository.PaymentAccountRepository
 import com.financetracker.data.repository.TransactionRepository
 import com.financetracker.domain.calculator.Money
+import com.financetracker.domain.model.BankTransfer
+import com.financetracker.domain.model.ParsedNotification
 import com.financetracker.domain.model.Category
 import com.financetracker.domain.model.PaymentAccount
 import com.financetracker.domain.model.Transaction
 import com.financetracker.domain.model.TransactionType
+import com.financetracker.notification.NotificationLogger
+import com.financetracker.notification.NotificationLogEntry
+import com.financetracker.notification.PaymentRecorder
+import com.financetracker.notification.RecognitionApps
+import com.financetracker.notification.RecognitionStatus
+import com.financetracker.notification.parser.PaymentParsers
 import com.financetracker.ui.component.KeypadKey
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -27,6 +36,7 @@ class AddTransactionViewModel(
     private val categoryRepo: CategoryRepository,
     private val accountRepo: PaymentAccountRepository,
     private val prefs: AppPreferences,
+    private val paymentRecorder: PaymentRecorder,
 ) : ViewModel() {
 
     val expenseCategories: StateFlow<List<Category>> =
@@ -77,12 +87,25 @@ class AddTransactionViewModel(
     val showEquals: StateFlow<Boolean> = _showEquals.asStateFlow()
 
     private var editId: Long? = null
+    private var originalSource = "manual"
+    private var recognitionSample: NotificationLogEntry? = null
+    private var parsedSample: ParsedNotification? = null
+
+    private val _bankTransfer = MutableStateFlow<BankTransfer?>(null)
+    val bankTransfer = _bankTransfer.asStateFlow()
+    private val _rememberTransferAccounts = MutableStateFlow(true)
+    val rememberTransferAccounts = _rememberTransferAccounts.asStateFlow()
+    private val _saveError = MutableStateFlow<String?>(null)
+    val saveError = _saveError.asStateFlow()
+
+    fun setRememberTransferAccounts(remember: Boolean) { _rememberTransferAccounts.value = remember }
+    fun dismissSaveError() { _saveError.value = null }
 
     init {
         viewModelScope.launch {
             val lastId = prefs.lastAccountId.first()
             val accs = accountRepo.getEnabled().first()
-            if (_selectedAccountId.value > 0) return@launch
+            if (_selectedAccountId.value > 0 || _bankTransfer.value != null) return@launch
             if (lastId > 0 && accs.any { it.id == lastId }) {
                 _selectedAccountId.value = lastId
             } else if (accs.isNotEmpty()) {
@@ -99,6 +122,8 @@ class AddTransactionViewModel(
             _selectedType.value = t.type
             _selectedCategoryId.value = t.categoryId
             _selectedAccountId.value = t.accountId
+            _transferToAccountId.value = t.transferToAccountId ?: -1L
+            originalSource = t.source
             _merchant.value = t.merchant
             _note.value = t.note
             _date.value = t.date
@@ -108,15 +133,35 @@ class AddTransactionViewModel(
     }
 
     fun loadRecognitionSample(id: String) {
-        val sample = com.financetracker.notification.NotificationLogger.getAll().find { it.id == id } ?: return
-        val value = com.financetracker.notification.parser.PaymentParsers.parse(sample.packageName, sample.title, sample.text)
+        if (recognitionSample?.id == id) return
+        val sample = NotificationLogger.getAll().find { it.id == id } ?: return
+        if (sample.status == RecognitionStatus.RECORDED || sample.status == RecognitionStatus.TRANSFER_CONFIRMATION) {
+            _saveError.value = "这条通知已处理，请核对账本"
+            return
+        }
+        val value = PaymentParsers.parse(sample.packageName, sample.title, sample.text)
+        recognitionSample = sample
+        parsedSample = value
+        _bankTransfer.value = value?.bankTransfer
         _amount.value = (value?.amount ?: sample.parsedAmount)?.let { Money.format(it) }.orEmpty()
         _selectedType.value = value?.transactionType ?: sample.transactionType ?: TransactionType.EXPENSE
         _merchant.value = value?.merchant ?: sample.merchant.orEmpty()
-        _date.value = sample.postedAt ?: sample.timestamp
-        _note.value = "识别补记：${sample.title}\n${sample.text.take(200)}"
+        _date.value = sample.postedAt?.takeIf { it > 0 } ?: sample.timestamp
+        val route = value?.bankTransfer
+        _note.value = route?.purpose?.label ?: "识别补记：${sample.title}\n${sample.text.take(200)}"
+        if (route != null) {
+            _selectedAccountId.value = -1L
+            _transferToAccountId.value = -1L
+            viewModelScope.launch {
+                paymentRecorder.confirmedBinding(route)?.let { binding ->
+                    if (_selectedAccountId.value <= 0) _selectedAccountId.value = binding.fromAccountId
+                    if (_transferToAccountId.value <= 0) _transferToAccountId.value = binding.toAccountId
+                }
+            }
+            return
+        }
         viewModelScope.launch {
-            val appId = com.financetracker.notification.RecognitionApps.find(sample.packageName)?.id
+            val appId = RecognitionApps.find(sample.packageName)?.id
             val type = value?.accountType ?: when (appId) {
                 "wechat", "alipay", "jd" -> appId
                 "meituan", "takeout", "dianping" -> "meituan"
@@ -146,6 +191,7 @@ class AddTransactionViewModel(
         updateShowEquals()
     }
     fun setType(type: TransactionType) {
+        if (_bankTransfer.value != null) return
         _selectedType.value = type
         if (type != TransactionType.EXPENSE) { _reimbursable.value = false; _reimbursed.value = false }
         _selectedCategoryId.value = -1L
@@ -280,10 +326,14 @@ class AddTransactionViewModel(
             cleanExpr.toBigDecimalOrNull()?.let { Money.round(it).toDouble() } ?: run { saveTriggered = false; return }
         }
         if (amt <= 0) { saveTriggered = false; return }
-        if (_selectedAccountId.value <= 0) { saveTriggered = false; return }
         val isTransfer = _selectedType.value == TransactionType.TRANSFER
-        if (isTransfer && _transferToAccountId.value <= 0) { saveTriggered = false; return }
-        if (isTransfer && _transferToAccountId.value == _selectedAccountId.value) { saveTriggered = false; return }
+        if (isTransfer && (_selectedAccountId.value <= 0 || _transferToAccountId.value <= 0 ||
+                _transferToAccountId.value == _selectedAccountId.value)) {
+            _saveError.value = "请选择不同的转出和转入账户"
+            saveTriggered = false
+            return
+        }
+        if (_selectedAccountId.value <= 0) { saveTriggered = false; return }
 
         val finalCategoryId: Long = if (!isTransfer && _selectedCategoryId.value <= 0) {
             val cats = if (_selectedType.value == TransactionType.INCOME) incomeCategories.value else expenseCategories.value
@@ -306,13 +356,47 @@ class AddTransactionViewModel(
             reimbursable = _selectedType.value == TransactionType.EXPENSE && _reimbursable.value,
             reimbursed = _selectedType.value == TransactionType.EXPENSE && _reimbursable.value && _reimbursed.value,
             date = _date.value,
-            source = "manual",
+            source = originalSource,
         )
+        val sample = recognitionSample
+        val parsed = parsedSample
+        val rememberAccounts = _rememberTransferAccounts.value
         viewModelScope.launch {
-            if (editId != null) transactionRepo.update(transaction)
-            else transactionRepo.add(transaction)
-            prefs.setLastAccountId(_selectedAccountId.value)
-            _saved.value = true
+            try {
+                if (sample != null && parsed?.bankTransfer != null) {
+                    val now = System.currentTimeMillis()
+                    val outcome = paymentRecorder.confirmTransfer(
+                        parsed.copy(amount = transaction.amount, payTime = transaction.date, merchant = transaction.merchant),
+                        sample.eventKey ?: "transfer-draft:${sample.id}", now, transaction.accountId,
+                        requireNotNull(transaction.transferToAccountId), rememberAccounts, transaction.note,
+                    )
+                    if (outcome != "已记账" && outcome != "重复已跳过") {
+                        _saveError.value = outcome
+                        saveTriggered = false
+                        return@launch
+                    }
+                    NotificationLogger.update(sample.id) {
+                        it.copy(
+                            parsed = true, parsedAmount = transaction.amount, merchant = transaction.merchant,
+                            transactionType = TransactionType.TRANSFER, outcome = outcome, stage = "确认转账",
+                            reason = if (outcome == "已记账") "已确认两端账户并保存转账" else "对应通知已入账",
+                            processedAt = now, recordedAt = now.takeIf { outcome == "已记账" },
+                        )
+                    }
+                } else if (editId != null) {
+                    transactionRepo.update(transaction)
+                } else {
+                    transactionRepo.add(transaction)
+                }
+                _saved.value = true
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _saveError.value = if (e is IllegalArgumentException) e.message ?: "账户不可用" else "保存失败，请重试"
+                saveTriggered = false
+                return@launch
+            }
+            prefs.setLastAccountId(transaction.accountId)
         }
     }
 
@@ -321,10 +405,11 @@ class AddTransactionViewModel(
         private val categoryRepo: CategoryRepository,
         private val accountRepo: PaymentAccountRepository,
         private val prefs: AppPreferences,
+        private val paymentRecorder: PaymentRecorder,
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
-            return AddTransactionViewModel(transactionRepo, categoryRepo, accountRepo, prefs) as T
+            return AddTransactionViewModel(transactionRepo, categoryRepo, accountRepo, prefs, paymentRecorder) as T
         }
     }
 }

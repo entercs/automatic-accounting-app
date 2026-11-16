@@ -22,8 +22,10 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -55,8 +57,10 @@ import com.financetracker.di.AppModule
 import com.financetracker.domain.model.Category
 import com.financetracker.domain.model.PaymentAccount
 import com.financetracker.domain.model.TransactionType
+import com.financetracker.domain.model.TransferPurpose
 import com.financetracker.ui.component.DateTimeWheelDialog
 import com.financetracker.ui.component.CalculatorKeypad
+import com.financetracker.ui.component.KeypadKey
 import com.financetracker.ui.component.SegmentedTab
 import com.financetracker.ui.component.VoiceInputButton
 import com.financetracker.ui.theme.CardLarge
@@ -67,13 +71,20 @@ import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun AddTransactionScreen(editTransactionId: Long? = null, refundTransactionId: Long? = null, sampleId: String? = null, onNavigateBack: () -> Unit) {
+fun AddTransactionScreen(
+    editTransactionId: Long? = null,
+    refundTransactionId: Long? = null,
+    sampleId: String? = null,
+    onManageAccounts: () -> Unit,
+    onNavigateBack: () -> Unit,
+) {
     val factory = remember {
         AddTransactionViewModel.Factory(
             AppModule.transactionRepository,
             AppModule.categoryRepository,
             AppModule.paymentAccountRepository,
             AppModule.appPreferences,
+            AppModule.paymentRecorder,
         )
     }
     val viewModel: AddTransactionViewModel = viewModel(factory = factory)
@@ -87,6 +98,9 @@ fun AddTransactionScreen(editTransactionId: Long? = null, refundTransactionId: L
         refundTransactionId?.let { viewModel.loadRefund(it) }
     }
 
+    val bankTransfer by viewModel.bankTransfer.collectAsState()
+    val rememberTransferAccounts by viewModel.rememberTransferAccounts.collectAsState()
+    val saveError by viewModel.saveError.collectAsState()
     val amount by viewModel.amount.collectAsState()
     val selectedType by viewModel.selectedType.collectAsState()
     val selectedCategoryId by viewModel.selectedCategoryId.collectAsState()
@@ -113,6 +127,14 @@ fun AddTransactionScreen(editTransactionId: Long? = null, refundTransactionId: L
 
     val categories = if (selectedType == TransactionType.EXPENSE) expenseCategories else incomeCategories
     val selectedAccount = accounts.find { it.id == selectedAccountId } ?: accounts.firstOrNull()
+
+    saveError?.let { message ->
+        AlertDialog(
+            onDismissRequest = viewModel::dismissSaveError,
+            text = { Text(message) },
+            confirmButton = { TextButton(onClick = viewModel::dismissSaveError) { Text("确定") } },
+        )
+    }
 
     // Account picker dialog
     if (showAccountPicker) {
@@ -143,12 +165,16 @@ fun AddTransactionScreen(editTransactionId: Long? = null, refundTransactionId: L
             // Keep the operation visible even when the form is scrolled.
             Row(Modifier.fillMaxWidth().padding(end = 16.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onNavigateBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回") }
-                SegmentedTab(
-                    options = listOf("支出" to TransactionType.EXPENSE, "收入" to TransactionType.INCOME, "转账" to TransactionType.TRANSFER),
-                    selected = selectedType,
-                    onSelect = viewModel::setType,
-                    modifier = Modifier.weight(1f),
-                )
+                if (bankTransfer != null) {
+                    Text("确认转账", style = MaterialTheme.typography.titleLarge)
+                } else {
+                    SegmentedTab(
+                        options = listOf(TransactionType.EXPENSE, TransactionType.INCOME, TransactionType.TRANSFER).map { it.label to it },
+                        selected = selectedType,
+                        onSelect = viewModel::setType,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
             }
             LazyColumn(
                 modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp),
@@ -173,9 +199,11 @@ fun AddTransactionScreen(editTransactionId: Long? = null, refundTransactionId: L
                             singleLine = true,
                             readOnly = true,
                                                     )
-                        VoiceInputButton { (amt, _, merch) ->
-                            amt?.let { a -> viewModel.setAmount(Money.format(a)) }
-                            merch?.let { m -> viewModel.setMerchant(m) }
+                        if (bankTransfer == null) {
+                            VoiceInputButton { (amt, _, merch) ->
+                                amt?.let { a -> viewModel.setAmount(Money.format(a)) }
+                                merch?.let { m -> viewModel.setMerchant(m) }
+                            }
                         }
                     }
                 }
@@ -207,11 +235,16 @@ fun AddTransactionScreen(editTransactionId: Long? = null, refundTransactionId: L
 
                 // Transfer account selectors (only for transfer)
                 if (selectedType == TransactionType.TRANSFER) {
+                    val route = bankTransfer
+                    val sources = if (route == null) accounts else accounts.filter { it.type == "bank" }
+                    val destinations = accounts.filter {
+                        it.id != selectedAccountId && (route == null || it.type == route.purpose.destinationType)
+                    }
                     item {
-                        Text("转出账户", style = MaterialTheme.typography.titleLarge)
+                        Text(route?.let { "转出账户 · ${it.sourceLabel}" } ?: "转出账户", style = MaterialTheme.typography.titleLarge)
                         Spacer(modifier = Modifier.height(8.dp))
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            accounts.forEach { account ->
+                            sources.forEach { account ->
                                 AccountChip(account, isSelected = selectedAccountId == account.id) {
                                     viewModel.setAccountId(account.id)
                                 }
@@ -219,14 +252,32 @@ fun AddTransactionScreen(editTransactionId: Long? = null, refundTransactionId: L
                         }
                     }
                     item {
-                        Text("转入账户", style = MaterialTheme.typography.titleLarge)
+                        Text(route?.let { "转入账户 · ${it.purpose.destinationLabel}" } ?: "转入账户", style = MaterialTheme.typography.titleLarge)
                         Spacer(modifier = Modifier.height(8.dp))
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            accounts.filter { it.id != selectedAccountId }.forEach { account ->
+                            destinations.forEach { account ->
                                 AccountChip(account, isSelected = transferToAccountId == account.id) {
                                     viewModel.setTransferToAccountId(account.id)
                                 }
                             }
+                        }
+                    }
+                }
+
+                bankTransfer?.let { route ->
+                    item {
+                        if (accounts.none { it.type == "bank" } || accounts.none { it.type == route.purpose.destinationType }) {
+                            Text("请先添加对应的转出和转入账户。", style = MaterialTheme.typography.bodyMedium)
+                        }
+                        if (route.purpose == TransferPurpose.JD_REPAYMENT) {
+                            val account = accounts.find { it.id == transferToAccountId }
+                            val balance = account?.let { "账本余额 ¥${Money.format(it.balance)}。 " }.orEmpty()
+                            Text("${balance}请核对还款前的欠款，欠款以负余额记录。", style = MaterialTheme.typography.bodyMedium)
+                        }
+                        TextButton(onClick = onManageAccounts) { Text("管理账户") }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(checked = rememberTransferAccounts, onCheckedChange = viewModel::setRememberTransferAccounts)
+                            Text("以后这张卡的${route.purpose.label}使用这两个账户")
                         }
                     }
                 }
@@ -300,13 +351,20 @@ fun AddTransactionScreen(editTransactionId: Long? = null, refundTransactionId: L
                 item { Spacer(modifier = Modifier.height(4.dp)) }
             }
 
-            // Calculator keypad with account indicator
-            CalculatorKeypad(
-                showEquals = showEquals,
-                selectedAccount = if (selectedType != TransactionType.TRANSFER) selectedAccount else null,
-                onAccountClick = { showAccountPicker = true },
-                onKey = { key -> viewModel.onKeypadKey(key) },
-            )
+            if (bankTransfer != null) {
+                Button(
+                    onClick = { viewModel.onKeypadKey(KeypadKey.SAVE) },
+                    enabled = accounts.any { it.id == selectedAccountId } && accounts.any { it.id == transferToAccountId },
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                ) { Text("保存转账") }
+            } else {
+                CalculatorKeypad(
+                    showEquals = showEquals,
+                    selectedAccount = if (selectedType != TransactionType.TRANSFER) selectedAccount else null,
+                    onAccountClick = { showAccountPicker = true },
+                    onKey = { key -> viewModel.onKeypadKey(key) },
+                )
+            }
         }
     }
 

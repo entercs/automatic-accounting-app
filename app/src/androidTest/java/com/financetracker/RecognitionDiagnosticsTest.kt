@@ -33,7 +33,7 @@ class RecognitionDiagnosticsTest {
     }
     @Test fun richerFieldsRoundTripWithoutChangingIdentityOrOriginalTimes() {
         val item = record(System.currentTimeMillis()).copy(outcome = "已记账", parsed = true, parsedAmount = 16.90,
-            postedAt = 1234L, reason = "已保存", stage = "入账", merchant = "商户", paymentMethod = "花呗", transactionType = TransactionType.EXPENSE)
+            postedAt = 1234L, reason = "已保存", stage = "入账", merchant = "商户", paymentMethod = "花呗", transactionType = TransactionType.EXPENSE, eventKey = "hashed-event")
         assertEquals(item, RecognitionCodec.decode(RecognitionCodec.encode(listOf(item))).single())
     }
     @Test fun interruptedCaptureIsMarkedForReconciliationRatherThanReplayed() {

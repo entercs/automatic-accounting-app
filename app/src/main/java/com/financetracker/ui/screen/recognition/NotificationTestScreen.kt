@@ -14,7 +14,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.financetracker.domain.model.ParsedNotification
-import com.financetracker.domain.model.TransactionType
+import com.financetracker.di.AppModule
+import com.financetracker.domain.model.PaymentRoutes
 import com.financetracker.notification.NotificationLogger
 import com.financetracker.notification.RecognitionApps
 import com.financetracker.notification.parser.PaymentParsers
@@ -34,6 +35,16 @@ fun NotificationTestScreen(sampleId: String, onBack: () -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     var result by remember { mutableStateOf<ParsedNotification?>(null) }
     var feedback by remember { mutableStateOf<String?>(null) }
+    val route = result?.bankTransfer
+    var boundAccounts by remember(result) { mutableStateOf<Pair<String, String>?>(null) }
+    LaunchedEffect(result) {
+        val binding = route?.let { AppModule.paymentRecorder.confirmedBinding(it) }
+        if (binding != null) {
+            val from = AppModule.paymentAccountRepository.getById(binding.fromAccountId)
+            val to = AppModule.paymentAccountRepository.getById(binding.toAccountId)
+            if (from != null && to != null) boundAccounts = from.name to to.name
+        }
+    }
     val app = RecognitionApps.find(pkg.trim())
     fun resetResult() { result = null; feedback = null }
     Scaffold(topBar = { TopAppBar(title = { Text("测试通知") }, navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回") } }) }) { padding ->
@@ -67,6 +78,7 @@ fun NotificationTestScreen(sampleId: String, onBack: () -> Unit) {
                 val titles = when (app?.id) {
                     "wechat" -> listOf("微信支付", "收款通知", "微信红包")
                     "alipay" -> listOf("交易提醒", "支付通知", "收款通知")
+                    "cmb" -> listOf("数字人民币充钱包扣款", "快捷支付扣款")
                     else -> listOf("交易提醒", "支付成功", "退款成功")
                 }
                 titles.forEach { suggestion -> SuggestionChip(onClick = { title = suggestion; resetResult() }, label = { Text(suggestion) }) }
@@ -82,10 +94,18 @@ fun NotificationTestScreen(sampleId: String, onBack: () -> Unit) {
                     Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(text, style = MaterialTheme.typography.titleMedium, color = if (result != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
                         result?.let { value ->
-                            Text("${if (value.transactionType == TransactionType.INCOME) "收入" else "支出"} ¥${Money.format(value.amount)}", style = MaterialTheme.typography.headlineMedium)
-                            Text("商户：${value.merchant}")
-                            Text("付款方式：${value.paymentMethod ?: "通知未提供"}")
-                            Text("归属途径：${when (value.accountType) { "wechat" -> "微信"; "alipay" -> "支付宝"; "bank" -> "银行卡"; "jd" -> "京东"; "meituan" -> "美团"; else -> value.accountType }}")
+                            Text("${value.transactionType.label} ¥${Money.format(value.amount)}", style = MaterialTheme.typography.headlineMedium)
+                            val transfer = value.bankTransfer
+                            if (transfer != null) {
+                                Text("用途：${transfer.purpose.label}")
+                                Text("转出账户：${boundAccounts?.first ?: transfer.sourceLabel}")
+                                Text("转入账户：${boundAccounts?.second ?: transfer.purpose.destinationLabel}")
+                                if (boundAccounts == null) Text("待确认账本账户")
+                            } else {
+                                Text("商户：${value.merchant}")
+                                Text("付款方式：${value.paymentMethod ?: "通知未提供"}")
+                                Text("归属途径：${PaymentRoutes.options(emptyList())[value.accountType] ?: value.accountType}")
+                            }
                         }
                         Text("这只是解析预览；真实自动记账还需要接收通知并匹配可用账户。", style = MaterialTheme.typography.bodySmall)
                     }

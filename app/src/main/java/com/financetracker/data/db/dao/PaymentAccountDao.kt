@@ -42,6 +42,10 @@ interface PaymentAccountDao {
     @Query("UPDATE payment_accounts SET name = :name, color = :color, balance = :balance WHERE id = :id")
     suspend fun updateDetails(id: Long, name: String, color: String, balance: Double)
 
-    @Query("DELETE FROM payment_accounts WHERE id = :id")
-    suspend fun deleteById(id: Long)
+    @Query("""
+        DELETE FROM payment_accounts WHERE id = :id AND NOT EXISTS (
+            SELECT 1 FROM transactions WHERE accountId = :id OR (type = 'TRANSFER' AND transferToAccountId = :id)
+        )
+    """)
+    suspend fun deleteById(id: Long): Int
 }

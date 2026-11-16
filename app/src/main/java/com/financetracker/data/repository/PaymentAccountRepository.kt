@@ -31,7 +31,7 @@ class PaymentAccountRepository(private val dao: PaymentAccountDao) {
     suspend fun create(name: String, type: String, color: String, balance: Double): Long =
         dao.insert(PaymentAccountEntity(name = name, type = type, color = color, balance = balance))
 
-    suspend fun delete(id: Long) = dao.deleteById(id)
+    suspend fun delete(id: Long): Int = dao.deleteById(id)
 
     // One-time: rename old default names
     suspend fun fixAccountNames() {

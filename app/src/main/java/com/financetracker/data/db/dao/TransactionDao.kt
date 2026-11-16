@@ -57,6 +57,7 @@ interface TransactionDao {
             OR note LIKE '%' || :query || '%'
             OR CAST(amount AS TEXT) LIKE '%' || :query || '%'
             OR accountId IN (SELECT id FROM payment_accounts WHERE name LIKE '%' || :query || '%')
+            OR (type = 'TRANSFER' AND transferToAccountId IN (SELECT id FROM payment_accounts WHERE name LIKE '%' || :query || '%'))
             OR categoryId IN (SELECT id FROM categories WHERE name LIKE '%' || :query || '%'))
         AND (:hasCategories = 0 OR categoryId IN (:categoryIds))
         AND (:hasPaymentTypes = 0
@@ -85,7 +86,7 @@ interface TransactionDao {
     """)
     suspend fun getCategoryTotal(type: String, categoryId: Long, startOfMonth: Long, endOfMonth: Long): Double
 
-    @Query("SELECT COUNT(*) FROM transactions WHERE accountId = :accountId")
+    @Query("SELECT COUNT(*) FROM transactions WHERE accountId = :accountId OR (type = 'TRANSFER' AND transferToAccountId = :accountId)")
     suspend fun countByAccountId(accountId: Long): Int
 
     @Query("""

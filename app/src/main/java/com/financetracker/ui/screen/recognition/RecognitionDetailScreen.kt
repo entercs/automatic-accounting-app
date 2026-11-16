@@ -14,7 +14,7 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import com.financetracker.notification.*
-import com.financetracker.domain.model.TransactionType
+import com.financetracker.notification.parser.PaymentParsers
 import com.financetracker.ui.theme.CardLarge
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -22,6 +22,9 @@ import com.financetracker.ui.theme.CardLarge
 fun RecognitionDetailScreen(id: String, onBack: () -> Unit, onTest: (String) -> Unit, onManualAdd: (String) -> Unit) {
     val logs by NotificationLogger.logs.collectAsState()
     val entry = logs.find { it.id == id }
+    val bankTransfer = remember(entry?.packageName, entry?.title, entry?.text) {
+        entry?.let { PaymentParsers.parse(it.packageName, it.title, it.text)?.bankTransfer }
+    }
     val clipboard = LocalClipboardManager.current
     var copied by remember { mutableStateOf(false) }
     Scaffold(topBar = { TopAppBar(title = { Text("识别详情") }, navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回") } }) }) { padding ->
@@ -54,8 +57,12 @@ fun RecognitionDetailScreen(id: String, onBack: () -> Unit, onTest: (String) -> 
                 entry.reminderRequestedAt?.let { DetailLine("提醒尝试时间", recordTime(it, "yyyy-MM-dd HH:mm:ss")) }
                 entry.reminderPostedAt?.let { DetailLine("提醒提交时间", recordTime(it, "yyyy-MM-dd HH:mm:ss")) }
                 entry.reminderOutcome?.let { DetailLine("提醒结果", it) }
-                entry.transactionType?.let { DetailLine("收支方向", if (it == TransactionType.INCOME) "收入" else "支出") }
-                entry.merchant?.let { DetailLine("商户", it) }
+                entry.transactionType?.let { DetailLine("交易类型", it.label) }
+                bankTransfer?.let {
+                    DetailLine("转出账户", it.sourceLabel)
+                    DetailLine("转入途径", it.purpose.destinationLabel)
+                }
+                entry.merchant?.let { DetailLine(if (bankTransfer == null) "商户" else "用途", it) }
                 entry.paymentMethod?.let { DetailLine("付款方式", it) }
                 DetailLine("通知标题", entry.title.ifBlank { "未提供" })
                 DetailLine("通知正文", entry.text.ifBlank { "无可用正文，或非交易通知未保留正文" })
@@ -65,8 +72,8 @@ fun RecognitionDetailScreen(id: String, onBack: () -> Unit, onTest: (String) -> 
                     OutlinedButton(onClick = { onTest(entry.id) }, modifier = Modifier.fillMaxWidth()) { Text("用此记录测试") }
                 }
                 if ((entry.needsAttention || (entry.status == RecognitionStatus.SKIPPED && entry.reason.contains("五分钟"))) && entry.text.isNotBlank()) {
-                    OutlinedButton(onClick = { onManualAdd(entry.id) }, modifier = Modifier.fillMaxWidth()) { Text("带入手动记账") }
-                    Text("仅填入草稿，请核对账本与账户后再保存。", style = MaterialTheme.typography.bodySmall)
+                    OutlinedButton(onClick = { onManualAdd(entry.id) }, modifier = Modifier.fillMaxWidth()) { Text(if (bankTransfer == null) "带入手动记账" else "确认转账") }
+                    Text("请核对账本与账户后再保存。", style = MaterialTheme.typography.bodySmall)
                 }
             }
         }

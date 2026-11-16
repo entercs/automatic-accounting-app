@@ -106,7 +106,15 @@ fun RecognitionRecordsScreen(onBack: () -> Unit, onDetail: (String) -> Unit, onT
                                     color = if (entry.needsAttention) MaterialTheme.colorScheme.error else if (entry.status == RecognitionStatus.RECORDED) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                             Text(entry.title.ifBlank { "无标题通知" }, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium)
-                            if (entry.parsedAmount != null) Text("${if (entry.transactionType == com.financetracker.domain.model.TransactionType.INCOME) "+" else "−"} ¥${Money.format(entry.parsedAmount)}", style = MaterialTheme.typography.titleLarge)
+                            if (entry.parsedAmount != null) {
+                                val prefix = when (entry.transactionType) {
+                                    com.financetracker.domain.model.TransactionType.INCOME -> "+"
+                                    com.financetracker.domain.model.TransactionType.TRANSFER -> "↔"
+                                    com.financetracker.domain.model.TransactionType.EXPENSE -> "−"
+                                    null -> ""
+                                }
+                                Text("$prefix ¥${Money.format(entry.parsedAmount)}", style = MaterialTheme.typography.titleLarge)
+                            }
                             Text("${recordTime(entry.timestamp, "HH:mm:ss")} · ${entry.source}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             if (entry.reason.isNotBlank()) Text(entry.reason, maxLines = if (entry.status == RecognitionStatus.SERVICE) 1 else 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }

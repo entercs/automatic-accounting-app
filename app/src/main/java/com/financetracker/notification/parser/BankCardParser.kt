@@ -9,14 +9,10 @@ class BankCardParser : NotificationParser {
         "com.chinamworld.bocmbci",   // 中国银行
         "com.android.bankabc",       // 农业银行
         "com.chinamworld.main",      // 建设银行
-        "cmb.pb",                    // 招商银行 (新版)
-        "com.cmbchina.ccs.pluto",    // 招商银行 (旧版/企业版)
-        "com.cmbc.ccs",              // 招商银行 (信用卡)
-        "com.cmbchina.pocket",       // 招商银行 (招行 App)
         "com.bankcomm.maidanba",     // 交通银行
         "com.psbc.mobilebank",       // 邮储银行
         "cn.gov.pbc.dcep",           // 数字人民币
-    )
+    ) + BankTransferTemplates.cmbPackages
 
     // 收入关键词
     private val incomeKeywords = listOf("收款", "入账", "到账", "转入", "存入", "收入", "奖励", "红包", "退款", "提现到账")
@@ -55,6 +51,10 @@ class BankCardParser : NotificationParser {
         // 非交易类标题直接跳过
         if (nonTransactionTitles.any { title.contains(it) }) {
             return null
+        }
+
+        if (packageName in BankTransferTemplates.cmbPackages && BankTransferTemplates.looksLikeTransfer(title, text)) {
+            return BankTransferTemplates.parse(title, text)
         }
 
         val combined = "$title $text"

@@ -45,7 +45,7 @@ class HomeUndoTest {
         val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).build()
         var store: ViewModelStore? = null
         try {
-            val repo = TransactionRepository(db.transactionDao(), db.paymentAccountDao())
+            val repo = TransactionRepository(db)
             val tx = seed(db, repo)
             val (vm, ownedStore) = model(db, repo, 300); store = ownedStore
             instrumentation.runOnMainSync { vm.deleteTransaction(tx) }
@@ -62,7 +62,7 @@ class HomeUndoTest {
         val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).build()
         var store: ViewModelStore? = null
         try {
-            val repo = TransactionRepository(db.transactionDao(), db.paymentAccountDao())
+            val repo = TransactionRepository(db)
             val tx = seed(db, repo)
             val (vm, ownedStore) = model(db, repo, 10000); store = ownedStore
             instrumentation.runOnMainSync { vm.deleteTransaction(tx) }
@@ -77,7 +77,7 @@ class HomeUndoTest {
         val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).build()
         var store: ViewModelStore? = null
         try {
-            val repo = TransactionRepository(db.transactionDao(), db.paymentAccountDao())
+            val repo = TransactionRepository(db)
             val first = seed(db, repo); val second = seed(db, repo, 30.0)
             val (vm, ownedStore) = model(db, repo, 500); store = ownedStore
             instrumentation.runOnMainSync { vm.deleteTransaction(first) }
@@ -94,7 +94,7 @@ class HomeUndoTest {
         val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).build()
         var store: ViewModelStore? = null
         try {
-            val repo = TransactionRepository(db.transactionDao(), db.paymentAccountDao())
+            val repo = TransactionRepository(db)
             val tx = seed(db, repo)
             val (vm, ownedStore) = model(db, repo, 10000); store = ownedStore
             instrumentation.runOnMainSync { vm.deleteTransaction(tx); vm.deleteTransaction(tx) }

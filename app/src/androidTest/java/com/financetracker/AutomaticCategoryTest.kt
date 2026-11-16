@@ -44,7 +44,7 @@ class AutomaticCategoryTest {
         try {
             db.categoryDao().insert(CategoryEntity(8, "其他支出", "📂", "EXPENSE"))
             PaymentAccountRepository(db.paymentAccountDao()).seedIfEmpty()
-            val repo = TransactionRepository(db.transactionDao(), db.paymentAccountDao())
+            val repo = TransactionRepository(db)
             val auto = repo.add(Transaction(amount = 1.0, type = TransactionType.EXPENSE, categoryId = 8, accountId = 1, merchant = "旧自动", date = 1234L, source = "notification"))
             val manual = repo.add(Transaction(amount = 2.0, type = TransactionType.EXPENSE, categoryId = 8, accountId = 1, merchant = "手动", date = 2345L))
             val before = db.transactionDao().getAll().first()

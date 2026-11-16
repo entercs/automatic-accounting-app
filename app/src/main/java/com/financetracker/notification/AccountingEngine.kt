@@ -11,7 +11,9 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.financetracker.FinanceTrackerApp
 import com.financetracker.MainActivity
+import com.financetracker.di.AppModule
 import com.financetracker.domain.model.ParsedNotification
+import com.financetracker.domain.model.TransactionType
 import com.financetracker.notification.parser.PaymentParsers
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
@@ -35,15 +37,26 @@ object AccountingEngine {
                 notification.flags and Notification.FLAG_GROUP_SUMMARY != 0, payload.body, candidate, postedAt, receivedAt,
                 captureStartedAt = if (eventId != null) PaymentMonitor.status.value.captureStartedAt else null,
             )
-            val skipped = admission.reason
+            val confirmation = if (admission.reason == null || admission.needsReview) {
+                PaymentParsers.transferConfirmationReason(pkg, payload.title, payload.body)
+            } else null
+            val skipped = confirmation ?: admission.reason
+            val key = if (candidate) {
+                eventKey(eventId ?: "$pkg:${payload.title}:${payload.body}:${receivedAt / 10_000}")
+            } else null
             val entry = NotificationLogEntry(receivedAt, pkg,
                 if (candidate) payload.title else "非交易通知", if (candidate) payload.body else "", false,
-                outcome = when { admission.needsReview -> "待补记：通知时间需核对"; skipped == null -> "处理中"; else -> "已跳过" }, source = source,
+                outcome = when {
+                    confirmation != null -> "转账回执"
+                    admission.needsReview -> "待补记：通知时间需核对"
+                    skipped == null -> "处理中"
+                    else -> "已跳过"
+                }, source = source,
                 reason = skipped ?: "已收到通知，正在解析", stage = "通知接收", postedAt = postedAt,
-                processedAt = if (skipped != null) receivedAt else null)
+                processedAt = if (skipped != null) receivedAt else null, eventKey = key)
             NotificationLogger.log(entry)
             if (skipped != null) return
-            submit(entry, eventId) { PaymentParsers.parse(pkg, payload.title, payload.body)?.copy(payTime = postedAt) }
+            submit(entry) { PaymentParsers.parse(pkg, payload.title, payload.body)?.copy(payTime = postedAt) }
         } catch (e: Exception) {
             Log.e("Accounting", "Notification extraction failed", e)
             NotificationLogger.log(NotificationLogEntry(receivedAt, pkg, "通知读取异常", "", false,
@@ -53,14 +66,15 @@ object AccountingEngine {
 
     fun screen(pkg: String, content: String, parsed: ParsedNotification?) {
         if (!ScreenCapturePolicy.allows(pkg)) return
+        if (PaymentParsers.transferConfirmationReason(pkg, "", content) != null) return
         if (parsed == null && !Regex("支付成功|付款成功|交易成功|收款成功|退款成功").containsMatchIn(content)) return
         val entry = NotificationLogEntry(System.currentTimeMillis(), pkg, "支付页面", content, false,
             outcome = "处理中", source = "屏幕补充", stage = "屏幕识别")
         NotificationLogger.log(entry)
-        submit(entry, null) { parsed }
+        submit(entry) { parsed }
     }
 
-    private fun submit(entry: NotificationLogEntry, eventId: String?, parse: () -> ParsedNotification?) {
+    private fun submit(entry: NotificationLogEntry, parse: () -> ParsedNotification?) {
         scope.launch {
             var parsed: ParsedNotification? = null
             var recordedAt: Long? = null
@@ -73,9 +87,8 @@ object AccountingEngine {
                     NotificationLogger.update(entry.id) { it.copy(stage = "入账", reason = "已解析，正在核对账户与重复事件") }
                     val now = System.currentTimeMillis()
                     if (deduplicator.isDuplicate(entry.packageName, value, entry.source, now)) return@withLock "重复已跳过"
-                    val identity = eventId ?: "${entry.packageName}:${entry.title}:${entry.text}:${now / 10_000}"
-                    val key = MessageDigest.getInstance("SHA-256").digest(identity.toByteArray()).joinToString("") { "%02x".format(it) }
-                    val outcome = PaymentRecorder(FinanceTrackerApp.instance.database).record(value, key, now)
+                    val key = entry.eventKey ?: eventKey("${entry.packageName}:${entry.title}:${entry.text}:${now / 10_000}")
+                    val outcome = AppModule.paymentRecorder.record(value, key, now)
                     if (outcome == "已记账") {
                         recordedAt = System.currentTimeMillis()
                         deduplicator.recorded(entry.packageName, value, entry.source, now)
@@ -108,6 +121,9 @@ object AccountingEngine {
         }
     }
 
+    private fun eventKey(identity: String): String =
+        MessageDigest.getInstance("SHA-256").digest(identity.toByteArray()).joinToString("") { "%02x".format(it) }
+
     private data class ReminderResult(val requestedAt: Long, val postedAt: Long? = null, val outcome: String)
 
     private fun notifyRecorded(value: ParsedNotification): ReminderResult {
@@ -122,7 +138,7 @@ object AccountingEngine {
             if (manager.getNotificationChannel("auto_accounting")?.importance == NotificationManager.IMPORTANCE_NONE) return ReminderResult(requestedAt, outcome = "记账成功，记账结果通知类别已关闭")
             val pending = PendingIntent.getActivity(context, 0, Intent(context, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
             manager.notify(1001, NotificationCompat.Builder(context, "auto_accounting")
-                .setSmallIcon(android.R.drawable.ic_menu_agenda).setContentTitle("已自动记账")
+                .setSmallIcon(android.R.drawable.ic_menu_agenda).setContentTitle(if (value.transactionType == TransactionType.TRANSFER) "已记转账" else "已自动记账")
                 .setContentText("${value.merchant} · ¥${Money.format(value.amount)}").setContentIntent(pending).setAutoCancel(true).build())
             ReminderResult(requestedAt, System.currentTimeMillis(), "已提交系统；实际显示由系统通知策略决定")
         } catch (e: Exception) {

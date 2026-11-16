@@ -9,10 +9,12 @@ import com.financetracker.data.db.dao.CategoryDao
 import com.financetracker.data.db.dao.ParsingRuleDao
 import com.financetracker.data.db.dao.PaymentAccountDao
 import com.financetracker.data.db.dao.TransactionDao
+import com.financetracker.data.db.dao.TransferAccountBindingDao
 import com.financetracker.data.db.entity.CategoryEntity
 import com.financetracker.data.db.entity.ParsingRuleEntity
 import com.financetracker.data.db.entity.PaymentAccountEntity
 import com.financetracker.data.db.entity.TransactionEntity
+import com.financetracker.data.db.entity.TransferAccountBinding
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -20,22 +22,34 @@ import kotlinx.coroutines.launch
 @Database(
     entities = [
         TransactionEntity::class,
+        TransferAccountBinding::class,
         CategoryEntity::class,
         PaymentAccountEntity::class,
         ParsingRuleEntity::class,
         com.financetracker.data.db.entity.AccountingReceipt::class,
     ],
-    version = 8,
+    version = 9,
     exportSchema = false,
 )
 abstract class AppDatabase : androidx.room.RoomDatabase() {
     abstract fun transactionDao(): TransactionDao
+    abstract fun transferAccountBindingDao(): TransferAccountBindingDao
     abstract fun categoryDao(): CategoryDao
     abstract fun paymentAccountDao(): PaymentAccountDao
     abstract fun parsingRuleDao(): ParsingRuleDao
     abstract fun accountingReceiptDao(): com.financetracker.data.db.dao.AccountingReceiptDao
 
     companion object {
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS transfer_account_bindings (
+                        route TEXT NOT NULL PRIMARY KEY, fromAccountId INTEGER NOT NULL, toAccountId INTEGER NOT NULL
+                    )
+                """.trimIndent())
+            }
+        }
+
         val MIGRATION_7_8 = object : Migration(7, 8) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE transactions ADD COLUMN reimbursed INTEGER NOT NULL DEFAULT 0")
@@ -120,7 +134,7 @@ abstract class AppDatabase : androidx.room.RoomDatabase() {
         fun create(context: Context): AppDatabase {
             return Room.databaseBuilder(context, AppDatabase::class.java, "finance_tracker.db")
                 .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
-                .addMigrations(MIGRATION_6_7, MIGRATION_7_8)
+                .addMigrations(MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
                 .addCallback(SeedCallback())
                 .build()
         }

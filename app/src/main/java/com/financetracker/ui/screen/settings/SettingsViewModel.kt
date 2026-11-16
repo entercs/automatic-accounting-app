@@ -84,10 +84,10 @@ class SettingsViewModel(
                 val transactions = transactionRepo.getRecent(10000).first()
                 val file = File(context.cacheDir, "finance_export_${System.currentTimeMillis()}.csv")
                 FileWriter(file).use { writer ->
-                    writer.write("\uFEFF日期,类型,金额,分类ID,账户ID,商户,备注,来源,报销状态\n")
+                    writer.write("\uFEFF日期,类型,金额,分类ID,账户ID,商户,备注,来源,报销状态,转入账户ID\n")
                     transactions.forEach { t ->
                         val status = when { !t.reimbursable || t.type != com.financetracker.domain.model.TransactionType.EXPENSE -> "无需报销"; t.reimbursed -> "已报销"; else -> "待报销" }
-                        val fields = listOf(t.date.toString(), t.type.name, Money.format(t.amount), t.categoryId.toString(), t.accountId.toString(), t.merchant, t.note, t.source, status)
+                        val fields = listOf(t.date.toString(), t.type.name, Money.format(t.amount), t.categoryId.toString(), t.accountId.toString(), t.merchant, t.note, t.source, status, t.transferToAccountId?.toString().orEmpty())
                         writer.write(fields.joinToString(",") { "\"" + it.replace("\"", "\"\"") + "\"" } + "\n")
                     }
                 }
@@ -122,9 +122,10 @@ class SettingsViewModel(
             val count = transactionRepo.countByAccountId(account.id)
             if (count > 0) {
                 _feedback.value = "「${account.name}」有 ${count} 笔交易记录，无法删除"
-            } else {
-                accountRepo.delete(account.id)
+            } else if (accountRepo.delete(account.id) > 0) {
                 _feedback.value = "「${account.name}」已删除"
+            } else {
+                _feedback.value = "账户状态已变化，请刷新后重试"
             }
         }
     }

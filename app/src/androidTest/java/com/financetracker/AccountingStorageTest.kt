@@ -137,9 +137,9 @@ class AccountingStorageTest {
         val name = "test_migration_${System.nanoTime()}.db"
         val template = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).build()
         try {
-            // Recreate the unchanged v6 tables from the actual Room schema, excluding only the new receipt table.
+            // Recreate the unchanged v6 tables from the actual Room schema, excluding the newer receipt and transfer binding tables.
             val statements = mutableListOf<String>()
-            template.openHelper.writableDatabase.query("SELECT sql FROM sqlite_master WHERE sql IS NOT NULL AND name NOT IN ('accounting_receipts','room_master_table','android_metadata','sqlite_sequence') AND name NOT LIKE 'sqlite_%'").use { cursor ->
+            template.openHelper.writableDatabase.query("SELECT sql FROM sqlite_master WHERE sql IS NOT NULL AND name NOT IN ('accounting_receipts','transfer_account_bindings','room_master_table','android_metadata','sqlite_sequence') AND name NOT LIKE 'sqlite_%'").use { cursor ->
                 while (cursor.moveToNext()) statements.add(cursor.getString(0))
             }
             context.getDatabasePath(name).parentFile!!.mkdirs()
@@ -149,7 +149,7 @@ class AccountingStorageTest {
                 old.execSQL("INSERT INTO transactions (id,amount,type,categoryId,accountId,transferToAccountId,merchant,note,reimbursable,date,source) VALUES (1,20.0,'EXPENSE',8,1,NULL,'原有账单','',0,1000,'manual')")
                 old.version = 6
             }
-            val migrated = Room.databaseBuilder(context, AppDatabase::class.java, name).addMigrations(AppDatabase.MIGRATION_6_7, AppDatabase.MIGRATION_7_8).build()
+            val migrated = Room.databaseBuilder(context, AppDatabase::class.java, name).addMigrations(AppDatabase.MIGRATION_6_7, AppDatabase.MIGRATION_7_8, AppDatabase.MIGRATION_8_9).build()
             try {
                 assertEquals("原有账单", migrated.transactionDao().getById(1)!!.merchant)
                 assertEquals(880.0, migrated.paymentAccountDao().getById(1)!!.balance, .001)

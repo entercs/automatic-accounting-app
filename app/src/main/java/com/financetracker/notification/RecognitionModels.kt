@@ -9,13 +9,14 @@ import java.util.UUID
 
 enum class RecognitionStatus(val label: String) {
     PROCESSING("处理中"), RECORDED("已记账"), UNRECOGNIZED("未识别"), PENDING("待补记"),
-    SKIPPED("已跳过"), FAILED("处理失败"), SERVICE("服务动态");
+    SKIPPED("已跳过"), TRANSFER_CONFIRMATION("转账回执"), FAILED("处理失败"), SERVICE("服务动态");
 
     companion object {
         fun of(outcome: String) = when {
             outcome == "已记账" -> RECORDED
             outcome == "处理中" -> PROCESSING
             outcome == "未识别" -> UNRECOGNIZED
+            outcome == "转账回执" -> TRANSFER_CONFIRMATION
             outcome.startsWith("待补记") -> PENDING
             outcome.startsWith("服务") -> SERVICE
             outcome.contains("失败") || outcome == "结果待核对" -> FAILED
@@ -46,6 +47,7 @@ data class NotificationLogEntry(
     val reminderRequestedAt: Long? = null,
     val reminderPostedAt: Long? = null,
     val reminderOutcome: String? = null,
+    val eventKey: String? = null,
 ) {
     val status get() = RecognitionStatus.of(outcome)
     val needsAttention get() = status in setOf(RecognitionStatus.UNRECOGNIZED, RecognitionStatus.PENDING, RecognitionStatus.FAILED) ||
@@ -64,7 +66,7 @@ data class NotificationLogEntry(
         reminderOutcome?.let { append("\n提醒结果: $it") }
         append("\n标题: $title\n内容: $text")
         parsedAmount?.let { append("\n金额: ${Money.format(it)}") }
-        transactionType?.let { append("\n方向: ${if (it == TransactionType.INCOME) "收入" else "支出"}") }
+        transactionType?.let { append("\n方向: ${it.label}") }
         merchant?.let { append("\n商户: $it") }
         paymentMethod?.let { append("\n付款方式: $it") }
     }
@@ -89,7 +91,7 @@ object RecognitionApps {
         RecognitionApp("boc", "中国银行", listOf("com.chinamworld.bocmbci")),
         RecognitionApp("abc", "农业银行", listOf("com.android.bankabc")),
         RecognitionApp("ccb", "建设银行", listOf("com.chinamworld.main")),
-        RecognitionApp("cmb", "招商银行", listOf("cmb.pb", "com.cmbchina.ccs.pluto", "com.cmbc.ccs", "com.cmbchina.pocket")),
+        RecognitionApp("cmb", "招商银行", listOf("cmb.pb", "com.cmbchina.ccs.pluto", "com.cmbc.ccs", "com.cmbchina.pocket"), "快捷支付扣款"),
         RecognitionApp("bocom", "交通银行", listOf("com.bankcomm.maidanba")),
         RecognitionApp("psbc", "邮储银行", listOf("com.psbc.mobilebank")),
         RecognitionApp("dcep", "数字人民币", listOf("cn.gov.pbc.dcep")),

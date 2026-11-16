@@ -10,7 +10,7 @@ class CaptureDeduplicator {
         entries.removeAll { now - it.time >= 12_000 }
         return entries.any {
             it.pkg == pkg && it.payment.amount == payment.amount && it.payment.transactionType == payment.transactionType &&
-                it.payment.merchant.trim() == payment.merchant.trim() &&
+                it.payment.merchant.trim() == payment.merchant.trim() && it.payment.bankTransfer == payment.bankTransfer &&
                 (it.channel != channel || channel == "屏幕补充")
         }
     }

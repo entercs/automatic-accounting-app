@@ -23,7 +23,7 @@ class TransactionFilterTest {
     private suspend fun seeded(db: AppDatabase): TransactionRepository {
         CategoryRepository(db.categoryDao()).seedIfEmpty()
         PaymentAccountRepository(db.paymentAccountDao()).seedIfEmpty()
-        val repo = TransactionRepository(db.transactionDao(), db.paymentAccountDao())
+        val repo = TransactionRepository(db)
         repo.add(Transaction(amount = 10.0, type = TransactionType.EXPENSE, categoryId = 1, accountId = 1, merchant = "公司午餐", note = "项目A", reimbursable = true, date = 1000))
         repo.add(Transaction(amount = 20.0, type = TransactionType.EXPENSE, categoryId = 2, accountId = 1, merchant = "文具", note = "项目A", reimbursable = true, reimbursed = true, date = 2000))
         repo.add(Transaction(amount = 5.0, type = TransactionType.EXPENSE, categoryId = 1, accountId = 1, merchant = "咖啡", date = 3000))
@@ -47,7 +47,7 @@ class TransactionFilterTest {
         try {
             PaymentAccountRepository(db.paymentAccountDao()).seedIfEmpty()
             repeat(35) { i -> db.transactionDao().insert(TransactionEntity(amount = 1.0, type = "EXPENSE", categoryId = if (i == 0) 2 else 1, accountId = 1, merchant = "账单$i", date = i.toLong())) }
-            val repo = TransactionRepository(db.transactionDao(), db.paymentAccountDao())
+            val repo = TransactionRepository(db)
             assertEquals(35, repo.filter("", emptySet(), ReimbursementFilter.ALL).first().size)
             assertEquals("账单0", repo.filter("", setOf(2), ReimbursementFilter.ALL).first().single().merchant)
         } finally { db.close() }
@@ -86,7 +86,7 @@ class TransactionFilterTest {
         val template = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).build()
         try {
             val schema = mutableListOf<String>()
-            template.openHelper.writableDatabase.query("SELECT sql FROM sqlite_master WHERE sql IS NOT NULL AND name NOT IN ('room_master_table','android_metadata','sqlite_sequence') AND name NOT LIKE 'sqlite_%'").use { c -> while (c.moveToNext()) schema.add(c.getString(0).replace(", `reimbursed` INTEGER NOT NULL DEFAULT 0", "")) }
+            template.openHelper.writableDatabase.query("SELECT sql FROM sqlite_master WHERE sql IS NOT NULL AND name NOT IN ('transfer_account_bindings','room_master_table','android_metadata','sqlite_sequence') AND name NOT LIKE 'sqlite_%'").use { c -> while (c.moveToNext()) schema.add(c.getString(0).replace(", `reimbursed` INTEGER NOT NULL DEFAULT 0", "")) }
             assertTrue(schema.none { "`reimbursed`" in it })
             context.getDatabasePath(name).parentFile!!.mkdirs()
             SQLiteDatabase.openOrCreateDatabase(context.getDatabasePath(name), null).use { old ->
@@ -96,7 +96,7 @@ class TransactionFilterTest {
                 old.execSQL("INSERT INTO accounting_receipts (eventId,createdAt) VALUES ('legacy',1000)")
                 old.version = 7
             }
-            val db = Room.databaseBuilder(context, AppDatabase::class.java, name).addMigrations(AppDatabase.MIGRATION_7_8).build()
+            val db = Room.databaseBuilder(context, AppDatabase::class.java, name).addMigrations(AppDatabase.MIGRATION_7_8, AppDatabase.MIGRATION_8_9).build()
             try {
                 val row = db.transactionDao().getById(1)!!
                 assertTrue(row.reimbursable); assertFalse(row.reimbursed); assertEquals(20.0, row.amount, .001)
@@ -125,7 +125,7 @@ class TransactionFilterTest {
         val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).build()
         try {
             PaymentAccountRepository(db.paymentAccountDao()).seedIfEmpty()
-            val repo = TransactionRepository(db.transactionDao(), db.paymentAccountDao())
+            val repo = TransactionRepository(db)
             repo.add(Transaction(amount = 10.0, type = TransactionType.TRANSFER, categoryId = -1, accountId = 1, transferToAccountId = 2, date = 1000))
             assertEquals(1, repo.filter("", emptySet(), ReimbursementFilter.ALL, setOf("wechat")).first().size)
             assertEquals(1, repo.filter("", emptySet(), ReimbursementFilter.ALL, setOf("alipay")).first().size)

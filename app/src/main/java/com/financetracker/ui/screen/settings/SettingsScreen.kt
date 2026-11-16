@@ -160,7 +160,7 @@ private fun AccountEditor(account: PaymentAccount?, onDismiss: () -> Unit, onSav
         text = {
             Column(Modifier.heightIn(max = 560.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (account == null) FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    listOf("bank" to "银行卡", "wechat" to "微信", "alipay" to "支付宝", "jd" to "京东", "meituan" to "美团").forEach { (value, label) ->
+                    listOf("bank" to "银行卡", "wechat" to "微信", "alipay" to "支付宝", "jd" to "京东", "meituan" to "美团", "dcep" to "数字人民币钱包").forEach { (value, label) ->
                         FilterChip(selected = type == value, onClick = {
                             type = value; name = if (value == "bank") "" else label
                             color = com.financetracker.ui.theme.accountColorHex(value)
@@ -170,7 +170,7 @@ private fun AccountEditor(account: PaymentAccount?, onDismiss: () -> Unit, onSav
                 if (type == "bank") TextButton(onClick = { showBanks = true }) { Text("选择银行") }
                 OutlinedTextField(name, { name = it }, label = { Text("账户名称") }, placeholder = { Text(if (type == "bank") "例如：招商银行 1234" else "填写账户名称") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 BalanceCalculator(initialBalance = account?.balance ?: 0.0, doneLabel = if (account == null) "创建账户" else "保存账户", onDone = { balance ->
-                    val fallback = when (type) { "wechat" -> "微信"; "alipay" -> "支付宝"; "jd" -> "京东"; "meituan" -> "美团"; else -> "银行卡" }
+                    val fallback = when (type) { "wechat" -> "微信"; "alipay" -> "支付宝"; "jd" -> "京东"; "meituan" -> "美团"; "dcep" -> "数字人民币钱包"; else -> "银行卡" }
                     onSave(name.trim().ifBlank { fallback }, type, color, balance)
                 })
             }

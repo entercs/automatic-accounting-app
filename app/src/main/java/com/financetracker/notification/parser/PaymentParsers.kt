@@ -13,12 +13,21 @@ object PaymentParsers {
         if (!supports(pkg)) return false
         if (pkg == "com.tencent.mm") return Regex("微信支付|微信收款|收款到账|收款通知|支付凭证|微信红包|转账到账").containsMatchIn(title)
         if (pkg == "com.jd.jrapp" && "白条" !in "$title $text") return false
-        return Regex("交易|支付|扣款|入账|收款|退款|到账|支出|消费|还款").containsMatchIn("$title $text")
+        return Regex("交易|支付|扣款|入账|收款|退款|到账|支出|消费|还款|充值").containsMatchIn("$title $text")
     }
 
     fun failureReason(pkg: String, title: String, text: String): String {
         return rejectionReason(pkg, normalize(title), normalize(text))
+            ?: transferConfirmationReason(pkg, title, text)
             ?: "未匹配到有效的已完成交易金额或收支模板，可带入测试或手动核对"
+    }
+
+    fun transferConfirmationReason(pkg: String, title: String, text: String): String? {
+        val cleanTitle = normalize(title)
+        val cleanText = normalize(text)
+        if (rejectionReason(pkg, cleanTitle, cleanText) != null ||
+            !BankTransferTemplates.isConfirmation(pkg, cleanTitle, cleanText)) return null
+        return "充值或还款回执，请核对对应的银行扣款及转账记录"
     }
 
     private fun rejectionReason(pkg: String, title: String, text: String): String? {
@@ -36,7 +45,8 @@ object PaymentParsers {
     fun parse(pkg: String, title: String, text: String): ParsedNotification? {
         val cleanTitle = normalize(title)
         val cleanText = normalize(text)
-        if (rejectionReason(pkg, cleanTitle, cleanText) != null) return null
+        if (rejectionReason(pkg, cleanTitle, cleanText) != null ||
+            BankTransferTemplates.isConfirmation(pkg, cleanTitle, cleanText)) return null
         val parser = parsers.firstOrNull { pkg in it.supportedPackages } ?: return null
         val result = parser.parse(pkg, cleanTitle, cleanText) ?: return null
         if (!result.amount.isFinite() || result.amount <= 0) return null

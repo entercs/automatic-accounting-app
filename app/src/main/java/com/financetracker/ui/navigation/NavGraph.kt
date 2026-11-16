@@ -89,6 +89,7 @@ fun NavGraph(navController: NavHostController, modifier: Modifier = Modifier) {
             val editId = backStackEntry.arguments?.getLong("editId") ?: -1L
             val refundId = backStackEntry.arguments?.getLong("refundId") ?: -1L
             AddTransactionScreen(
+                onManageAccounts = { navController.navigate(Screen.Settings.route) },
                 sampleId = backStackEntry.arguments?.getString("sampleId")?.takeIf { it.isNotBlank() },
                 editTransactionId = if (editId > 0) editId else null,
                 refundTransactionId = if (refundId > 0) refundId else null,

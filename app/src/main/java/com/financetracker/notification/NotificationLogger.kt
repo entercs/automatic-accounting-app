@@ -40,6 +40,7 @@ object RecognitionCodec {
                 reminderRequestedAt = row.optionalTime("reminderRequestedAt"),
                 reminderPostedAt = row.optionalTime("reminderPostedAt"),
                 reminderOutcome = row.optString("reminderOutcome").ifBlank { null },
+                eventKey = row.optString("eventKey").ifBlank { null },
             )
         }.getOrNull() }
     }
@@ -50,7 +51,7 @@ object RecognitionCodec {
             .put("outcome", e.outcome).put("source", e.source).put("reason", e.reason).put("stage", e.stage)
             .put("postedAt", e.postedAt).put("merchant", e.merchant).put("type", e.transactionType?.name).put("method", e.paymentMethod)
             .put("processingStartedAt", e.processingStartedAt).put("processedAt", e.processedAt).put("recordedAt", e.recordedAt)
-            .put("reminderRequestedAt", e.reminderRequestedAt).put("reminderPostedAt", e.reminderPostedAt).put("reminderOutcome", e.reminderOutcome)) }
+            .put("reminderRequestedAt", e.reminderRequestedAt).put("reminderPostedAt", e.reminderPostedAt).put("reminderOutcome", e.reminderOutcome).put("eventKey", e.eventKey)) }
     }.toString()
 
     private fun JSONObject.optionalTime(key: String): Long? = if (has(key) && !isNull(key)) getLong(key) else null

@@ -1,17 +1,16 @@
 package com.financetracker.data.repository
 
-import com.financetracker.data.db.dao.PaymentAccountDao
-import com.financetracker.data.db.dao.TransactionDao
+import androidx.room.withTransaction
+import com.financetracker.data.db.AppDatabase
 import com.financetracker.data.db.entity.TransactionEntity
 import com.financetracker.domain.model.Transaction
 import com.financetracker.domain.model.TransactionType
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
-class TransactionRepository(
-    private val dao: TransactionDao,
-    private val accountDao: PaymentAccountDao,
-) {
+class TransactionRepository(private val db: AppDatabase) {
+    private val dao = db.transactionDao()
+    private val accountDao = db.paymentAccountDao()
 
     fun getRecent(limit: Int = 10): Flow<List<Transaction>> =
         dao.getRecent(limit).mapToDomain()
@@ -41,54 +40,41 @@ class TransactionRepository(
     suspend fun getById(id: Long): Transaction? =
         dao.getById(id)?.toDomain()
 
-    suspend fun add(transaction: Transaction): Long {
+    suspend fun add(transaction: Transaction): Long = db.withTransaction {
+        validateTransfer(transaction)
         val id = dao.insert(transaction.toEntity())
-        if (transaction.type == TransactionType.TRANSFER) {
-            // Transfer: source -= amount, dest += amount
-            updateAccountBalance(transaction.accountId, transaction.amount, TransactionType.EXPENSE)
-            transaction.transferToAccountId?.let { destId ->
-                updateAccountBalance(destId, transaction.amount, TransactionType.INCOME)
-            }
-        } else {
-            updateAccountBalance(transaction.accountId, transaction.amount, transaction.type)
-        }
-        return id
+        applyBalance(transaction, 1)
+        id
     }
 
-    suspend fun update(transaction: Transaction) {
-        val old = dao.getById(transaction.id) ?: return
+    suspend fun update(transaction: Transaction) = db.withTransaction {
+        val old = dao.getById(transaction.id)?.toDomain() ?: return@withTransaction
+        validateTransfer(transaction)
         dao.update(transaction.toEntity())
-        // Reverse old effect
-        if (TransactionType.valueOf(old.type) == TransactionType.TRANSFER) {
-            updateAccountBalance(old.accountId, -old.amount, TransactionType.EXPENSE)
-            old.transferToAccountId?.let { updateAccountBalance(it, -old.amount, TransactionType.INCOME) }
-        } else {
-            updateAccountBalance(old.accountId, -old.amount, TransactionType.valueOf(old.type))
-        }
-        // Apply new effect
-        if (transaction.type == TransactionType.TRANSFER) {
-            updateAccountBalance(transaction.accountId, transaction.amount, TransactionType.EXPENSE)
-            transaction.transferToAccountId?.let { updateAccountBalance(it, transaction.amount, TransactionType.INCOME) }
-        } else {
-            updateAccountBalance(transaction.accountId, transaction.amount, transaction.type)
-        }
+        applyBalance(old, -1)
+        applyBalance(transaction, 1)
     }
 
-    suspend fun delete(transaction: Transaction) {
-        dao.delete(transaction.toEntity())
-        if (transaction.type == TransactionType.TRANSFER) {
-            // Reverse: source += amount, dest -= amount
-            updateAccountBalance(transaction.accountId, transaction.amount, TransactionType.INCOME)
-            transaction.transferToAccountId?.let { updateAccountBalance(it, transaction.amount, TransactionType.EXPENSE) }
-        } else {
-            val reversedType = if (transaction.type == TransactionType.EXPENSE) TransactionType.INCOME else TransactionType.EXPENSE
-            updateAccountBalance(transaction.accountId, transaction.amount, reversedType)
-        }
+    suspend fun delete(transaction: Transaction) = db.withTransaction {
+        val stored = dao.getById(transaction.id) ?: return@withTransaction
+        dao.delete(stored)
+        applyBalance(stored.toDomain(), -1)
     }
 
-    private suspend fun updateAccountBalance(accountId: Long, amount: Double, type: TransactionType) {
-        val delta = if (type == TransactionType.EXPENSE) -amount else amount
-        accountDao.adjustBalance(accountId, delta)
+    private suspend fun validateTransfer(transaction: Transaction) {
+        if (transaction.type != TransactionType.TRANSFER) return
+        val destination = transaction.transferToAccountId
+        require(destination != null && destination != transaction.accountId &&
+            accountDao.getById(destination) != null) { "请选择不同的转出和转入账户" }
+    }
+
+    private suspend fun applyBalance(transaction: Transaction, multiplier: Int) {
+        val amount = transaction.amount * multiplier
+        val sourceDelta = if (transaction.type == TransactionType.INCOME) amount else -amount
+        accountDao.adjustBalance(transaction.accountId, sourceDelta)
+        if (transaction.type == TransactionType.TRANSFER) {
+            transaction.transferToAccountId?.let { accountDao.adjustBalance(it, amount) }
+        }
     }
 
     suspend fun getMonthlyTotal(

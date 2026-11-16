@@ -136,9 +136,11 @@ fun TransactionDetailScreen(
         ) {
             // Amount
             item {
-                val isExpense = t.type == TransactionType.EXPENSE
-                val color = if (isExpense) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
-                val prefix = if (isExpense) "-" else "+"
+                val (color, prefix) = when (t.type) {
+                    TransactionType.EXPENSE -> MaterialTheme.colorScheme.error to "-"
+                    TransactionType.INCOME -> MaterialTheme.colorScheme.primary to "+"
+                    TransactionType.TRANSFER -> MaterialTheme.colorScheme.onSurfaceVariant to "↔ "
+                }
                 Card(
                     modifier = Modifier.fillMaxWidth().softCardShadow(),
                     shape = CardLarge,
@@ -180,8 +182,17 @@ fun TransactionDetailScreen(
                 }
             }
 
-            // Account + category info
-            item {
+            if (t.type == TransactionType.TRANSFER) {
+                item {
+                    Card(Modifier.fillMaxWidth()) {
+                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            DetailRow("转出账户", currentAccount?.name ?: "未知账户")
+                            val destination = accounts.find { it.id == t.transferToAccountId }
+                            DetailRow("转入账户", destination?.name ?: "未知账户")
+                        }
+                    }
+                }
+            } else item {
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         // Category row - clickable
@@ -226,7 +237,7 @@ fun TransactionDetailScreen(
                 item {
                     Card(modifier = Modifier.fillMaxWidth()) {
                         Column(modifier = Modifier.padding(16.dp)) {
-                            DetailRow("商户", t.merchant)
+                            DetailRow(if (t.type == TransactionType.TRANSFER) "交易说明" else "商户", t.merchant)
                         }
                     }
                 }
